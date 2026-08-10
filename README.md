@@ -25,13 +25,32 @@ chmod +x setup.sh scripts/*.sh
 sudo ./setup.sh
 ```
 
-That runs, in order:
+That runs, in order (first time only):
 
 1. `scripts/01-install-docker.sh` — Docker via OMV-Extras / `openmediavault-compose` when OMV is detected
 2. `scripts/02-prepare-dirs.sh` — data + media folders under `NAS_ROOT`
 3. `scripts/03-deploy-stack.sh` — `docker compose up -d`
 
-Re-run `sudo ./scripts/03-deploy-stack.sh` anytime to apply `config.env` changes or pull updates.
+**You do not need to run `./setup.sh` again** to update apps. Setup is idempotent and keeps bind-mounted data, but day-to-day updates should use `./update.sh` so Docker install / Portainer wizard are not part of the flow.
+
+## Updating containers later
+
+Pull newer images and recreate containers. **Portainer login, Jellyfin config/libraries, and Vaultwarden vault stay on disk** under `NAS_ROOT` — only the container image/layers are refreshed.
+
+```bash
+# Update all (Portainer + Jellyfin + Vaultwarden)
+sudo ./update.sh
+
+# Update one app
+sudo ./update.sh jellyfin
+sudo ./update.sh portainer
+sudo ./update.sh vaultwarden
+
+# Optional: also delete unused old images afterward
+sudo ./update.sh --prune
+```
+
+After changing `config.env` (ports, signup flag, paths), either `sudo ./update.sh` or `sudo ./scripts/03-deploy-stack.sh` applies it.
 
 ## Configure `config.env`
 
@@ -76,7 +95,10 @@ $NAS_ROOT/
 ## Useful commands
 
 ```bash
-# Redeploy / update
+# Update images (preferred after first setup)
+sudo ./update.sh
+
+# Apply config.env / recreate stack (still keeps data)
 sudo ./scripts/03-deploy-stack.sh
 
 # Stop containers (keeps all data)
@@ -88,8 +110,9 @@ cd compose && sudo docker compose --env-file .env logs -f
 
 ## Notes
 
+- App state lives in bind mounts under `NAS_ROOT/docker/...`. Updating or recreating containers does **not** wipe Portainer’s admin user, Jellyfin’s library setup, or Vaultwarden passwords.
 - **Jellyfin** libraries are mounted read-only at `/data/{movies,tv,music}` inside the container.
-- If you previously deployed Plex from an older revision, redeploy removes the `plex` container automatically; your media files are untouched.
+- If you previously deployed Plex from an older revision, deploy/update removes the `plex` container automatically; your media files are untouched.
 - Scripts prefer **OMV-Extras** + `openmediavault-compose` on OpenMediaVault so you do not fight OMV’s package management. On plain Debian/Ubuntu they fall back to Docker CE.
 - This stack is for home LAN use. Add a reverse proxy + HTTPS (or Tailscale) before remote access, especially for Vaultwarden.
 
