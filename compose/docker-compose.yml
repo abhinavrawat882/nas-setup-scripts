@@ -1,0 +1,57 @@
+# NAS core stack: Portainer + Plex + Vaultwarden
+# Driven by compose/.env (generated from repo-root config.env by deploy script).
+# Project name comes from COMPOSE_PROJECT_NAME in .env.
+
+services:
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${NAS_ROOT}/docker/portainer:/data
+    ports:
+      - "${PORTAINER_PORT:-9000}:9000"
+      - "9443:9443"
+    networks:
+      - nas
+
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-100}
+      - TZ=${TZ:-UTC}
+      - VERSION=docker
+      - PLEX_CLAIM=${PLEX_CLAIM:-}
+    volumes:
+      - ${NAS_ROOT}/docker/plex/config:/config
+      - ${NAS_ROOT}/docker/plex/transcode:/transcode
+      - ${PLEX_MEDIA_PATH}:${PLEX_MEDIA_PATH}:ro
+    # host networking: use PLEX_PORT only as documentation for the host UI;
+    # Plex listens on 32400 on the host interface.
+
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-UTC}
+      - SIGNUPS_ALLOWED=${VAULTWARDEN_SIGNUPS_ALLOWED:-true}
+      - WEBSOCKET_ENABLED=true
+    volumes:
+      - ${NAS_ROOT}/docker/vaultwarden:/data
+    ports:
+      - "${VAULTWARDEN_PORT:-8080}:80"
+    networks:
+      - nas
+
+networks:
+  nas:
+    name: nas
+    driver: bridge
