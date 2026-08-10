@@ -12,12 +12,11 @@ load_config
 
 dirs=(
   "${NAS_ROOT}/docker/portainer"
-  "${NAS_ROOT}/docker/plex/config"
-  "${NAS_ROOT}/docker/plex/transcode"
+  "${NAS_ROOT}/docker/jellyfin/config"
   "${NAS_ROOT}/docker/vaultwarden"
-  "${PLEX_MEDIA_PATH}/movies"
-  "${PLEX_MEDIA_PATH}/tv"
-  "${PLEX_MEDIA_PATH}/music"
+  "${MEDIA_PATH}/movies"
+  "${MEDIA_PATH}/tv"
+  "${MEDIA_PATH}/music"
 )
 
 info "Creating directories under ${NAS_ROOT}"
@@ -28,9 +27,9 @@ done
 
 info "Setting ownership to ${PUID}:${PGID}"
 chown -R "${PUID}:${PGID}" \
-  "${NAS_ROOT}/docker/plex" \
+  "${NAS_ROOT}/docker/jellyfin" \
   "${NAS_ROOT}/docker/vaultwarden" \
-  "${PLEX_MEDIA_PATH}"
+  "${MEDIA_PATH}"
 
 # Portainer runs as root inside the container; keep data dir root-owned.
 chown -R root:root "${NAS_ROOT}/docker/portainer"

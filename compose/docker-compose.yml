@@ -1,4 +1,4 @@
-# NAS core stack: Portainer + Plex + Vaultwarden
+# NAS core stack: Portainer + Jellyfin + Vaultwarden
 # Driven by compose/.env (generated from repo-root config.env by deploy script).
 # Project name comes from COMPOSE_PROJECT_NAME in .env.
 
@@ -18,23 +18,24 @@ services:
     networks:
       - nas
 
-  plex:
-    image: lscr.io/linuxserver/plex:latest
-    container_name: plex
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
     restart: unless-stopped
-    network_mode: host
     environment:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-100}
       - TZ=${TZ:-UTC}
-      - VERSION=docker
-      - PLEX_CLAIM=${PLEX_CLAIM:-}
     volumes:
-      - ${NAS_ROOT}/docker/plex/config:/config
-      - ${NAS_ROOT}/docker/plex/transcode:/transcode
-      - ${PLEX_MEDIA_PATH}:${PLEX_MEDIA_PATH}:ro
-    # host networking: use PLEX_PORT only as documentation for the host UI;
-    # Plex listens on 32400 on the host interface.
+      - ${NAS_ROOT}/docker/jellyfin/config:/config
+      - ${MEDIA_PATH}/movies:/data/movies:ro
+      - ${MEDIA_PATH}/tv:/data/tv:ro
+      - ${MEDIA_PATH}/music:/data/music:ro
+    ports:
+      - "${JELLYFIN_PORT:-8096}:8096"
+      - "7359:7359/udp"
+    networks:
+      - nas
 
   vaultwarden:
     image: vaultwarden/server:latest
