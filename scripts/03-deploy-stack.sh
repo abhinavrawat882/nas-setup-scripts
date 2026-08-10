@@ -19,11 +19,17 @@ write_compose_env
 COMPOSE_FILE="${REPO_ROOT}/compose/docker-compose.yml"
 cd "${REPO_ROOT}/compose"
 
+# Drop a previous Plex container if this host was set up with the older stack.
+if docker ps -a --format '{{.Names}}' | grep -qx 'plex'; then
+  info "Removing legacy plex container"
+  docker rm -f plex >/dev/null
+fi
+
 info "Pulling images"
 docker compose -f "${COMPOSE_FILE}" --env-file .env pull
 
 info "Starting stack (${COMPOSE_PROJECT_NAME})"
-docker compose -f "${COMPOSE_FILE}" --env-file .env up -d
+docker compose -f "${COMPOSE_FILE}" --env-file .env up -d --remove-orphans
 
 info "Current containers"
 docker compose -f "${COMPOSE_FILE}" --env-file .env ps
@@ -31,7 +37,7 @@ docker compose -f "${COMPOSE_FILE}" --env-file .env ps
 echo
 info "Stack deployed. On your LAN:"
 echo "  Portainer:    http://<nas-ip>:${PORTAINER_PORT}"
-echo "  Plex:         http://<nas-ip>:${PLEX_PORT}/web"
+echo "  Jellyfin:     http://<nas-ip>:${JELLYFIN_PORT}"
 echo "  Vaultwarden:  http://<nas-ip>:${VAULTWARDEN_PORT}"
 echo
 if [[ "${VAULTWARDEN_SIGNUPS_ALLOWED}" == "true" ]]; then
