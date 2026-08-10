@@ -29,6 +29,7 @@ info "Pulling images"
 docker compose -f "${COMPOSE_FILE}" --env-file .env pull
 
 info "Starting stack (${COMPOSE_PROJECT_NAME})"
+info "Bind-mounted data under ${NAS_ROOT} is preserved (Portainer is not reset)"
 docker compose -f "${COMPOSE_FILE}" --env-file .env up -d --remove-orphans
 
 info "Current containers"
@@ -40,6 +41,7 @@ echo "  Portainer:    http://<nas-ip>:${PORTAINER_PORT}"
 echo "  Jellyfin:     http://<nas-ip>:${JELLYFIN_PORT}"
 echo "  Vaultwarden:  http://<nas-ip>:${VAULTWARDEN_PORT}"
 echo
+info "Day-to-day image updates: sudo ./update.sh  (does not re-run Docker install)"
 if [[ "${VAULTWARDEN_SIGNUPS_ALLOWED}" == "true" ]]; then
-  warn "Vaultwarden signups are ENABLED. Create your account, then set VAULTWARDEN_SIGNUPS_ALLOWED=false in config.env and re-run this script."
+  warn "Vaultwarden signups are ENABLED. Create your account, then set VAULTWARDEN_SIGNUPS_ALLOWED=false in config.env and re-run deploy or update."
 fi
