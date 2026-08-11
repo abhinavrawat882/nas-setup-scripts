@@ -13,8 +13,9 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${NAS_ROOT}/docker/portainer:/data
     ports:
-      - "${PORTAINER_PORT:-9000}:9000"
-      - "9443:9443"
+      # Bind to Tailscale only — avoids Docker publishing on 0.0.0.0 (UFW bypass).
+      - "${TAILSCALE_IP}:${PORTAINER_PORT:-9000}:9000"
+      - "${TAILSCALE_IP}:9443:9443"
     networks:
       - nas
 
@@ -32,6 +33,7 @@ services:
       - ${MEDIA_PATH}/tv:/data/tv:ro
       - ${MEDIA_PATH}/music:/data/music:ro
     ports:
+      # Jellyfin stays on all interfaces (LAN) for local discovery — not Tailscale-only.
       - "${JELLYFIN_PORT:-8096}:8096"
       - "7359:7359/udp"
     networks:
@@ -48,7 +50,7 @@ services:
     volumes:
       - ${NAS_ROOT}/docker/vaultwarden:/data
     ports:
-      - "${VAULTWARDEN_PORT:-8080}:80"
+      - "${TAILSCALE_IP}:${VAULTWARDEN_PORT:-8080}:80"
     networks:
       - nas
 

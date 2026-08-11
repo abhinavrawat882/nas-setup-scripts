@@ -2,13 +2,17 @@
 
 Idempotent scripts to put Docker on **OpenMediaVault**, then deploy:
 
-| App | What it is | Default URL |
-|-----|------------|-------------|
-| **Portainer** | Manage Docker from phone/browser | `http://<nas-ip>:9000` |
-| **Jellyfin** | Media server | `http://<nas-ip>:8096` |
-| **Vaultwarden** | Self-hosted Bitwarden-compatible password manager | `http://<nas-ip>:8080` |
+| App | What it is | Access |
+|-----|------------|--------|
+| **Portainer** | Manage Docker from phone/browser | Tailscale `http://<TAILSCALE_IP>:9000` |
+| **Vaultwarden** | Self-hosted Bitwarden-compatible password manager | Tailscale `http://<TAILSCALE_IP>:8080` |
+| **Jellyfin** | Media server | LAN `http://<lan-ip>:8096` (discovery on LAN) |
+| **RabbitMQ** | Message broker (projects stack) | Tailscale AMQP / management UI |
+| **Registry** | Private Docker registry (projects stack) | Tailscale `http://<TAILSCALE_IP>:5000` |
 
-LAN-first. Do not expose Vaultwarden to the public internet without HTTPS.
+Published ports (except Jellyfin) bind to **Tailscale only** so Docker does not publish on `0.0.0.0` and bypass UFW onto the LAN. Tailscale encrypts traffic on your private tailnet; it is not anonymity.
+
+Do not expose Vaultwarden to the public internet without HTTPS.
 
 ## Quick start
 
@@ -19,9 +23,9 @@ git clone https://github.com/abhinavrawat882/nas-setup-scripts.git
 cd nas-setup-scripts
 
 cp config.env.example config.env
-nano config.env   # set NAS_ROOT, PUID, PGID, TZ
+nano config.env   # set NAS_ROOT, PUID, PGID, TZ, TAILSCALE_IP, passwords
 
-chmod +x setup.sh scripts/*.sh
+chmod +x setup.sh scripts/*.sh update.sh
 sudo ./setup.sh
 ```
 
@@ -29,9 +33,16 @@ That runs, in order (first time only):
 
 1. `scripts/01-install-docker.sh` — Docker via OMV-Extras / `openmediavault-compose` when OMV is detected
 2. `scripts/02-prepare-dirs.sh` — data + media folders under `NAS_ROOT`
-3. `scripts/03-deploy-stack.sh` — `docker compose up -d`
+3. `scripts/03-deploy-stack.sh` — core stack `docker compose up -d`
 
 **You do not need to run `./setup.sh` again** to update apps. Setup is idempotent and keeps bind-mounted data, but day-to-day updates should use `./update.sh` so Docker install / Portainer wizard are not part of the flow.
+
+Optional projects stack (RabbitMQ + Registry), after core is up:
+
+```bash
+# set RABBITMQ_* and REGISTRY_* passwords in config.env first
+sudo ./scripts/05-deploy-projects.sh
+```
 
 ## Updating containers later
 
@@ -50,7 +61,7 @@ sudo ./update.sh vaultwarden
 sudo ./update.sh --prune
 ```
 
-After changing `config.env` (ports, signup flag, paths), either `sudo ./update.sh` or `sudo ./scripts/03-deploy-stack.sh` applies it.
+After changing `config.env` (ports, signup flag, paths, Tailscale IP), either `sudo ./update.sh` or `sudo ./scripts/03-deploy-stack.sh` applies it. For the projects stack, use `sudo ./scripts/05-deploy-projects.sh`.
 
 ## Configure `config.env`
 
@@ -60,26 +71,83 @@ After changing `config.env` (ports, signup flag, paths), either `sudo ./update.s
 | `PUID` / `PGID` | File ownership inside containers (OMV: often your uid + group `users` = `100`) |
 | `TZ` | Timezone |
 | `MEDIA_PATH` | Optional override; default `${NAS_ROOT}/media` |
+| `TAILSCALE_IP` | NAS Tailscale IP (default `100.92.27.123`); Portainer/Vaultwarden/RabbitMQ/Registry bind here |
 | `PORTAINER_PORT` / `JELLYFIN_PORT` / `VAULTWARDEN_PORT` | Host ports |
 | `VAULTWARDEN_SIGNUPS_ALLOWED` | `true` until you create an account, then `false` |
+| `RABBITMQ_USER` / `RABBITMQ_PASS` | Broker credentials (change from `changeme`) |
+| `REGISTRY_USER` / `REGISTRY_PASS` | Registry basic auth (change from `changeme`) |
+| `REGISTRY_KEEP_TAGS` | Tags to keep per repo when running GC with `--prune` (default `5`) |
 
-`config.env` and generated `compose/.env` are gitignored.
+`config.env` and generated `compose/.env` / `compose/projects/.env` are gitignored.
 
-## After deploy
+## After deploy (core)
 
-1. **Portainer** — open `:9000`, create the admin user, choose **Docker** / local environment. Use this from your phone or laptop to start/stop containers, view logs, etc.
-2. **Jellyfin** — open `:8096`, finish the setup wizard, and add libraries:
+1. **Portainer** — over Tailscale, open `http://<TAILSCALE_IP>:9000`, create the admin user, choose **Docker** / local environment.
+2. **Jellyfin** — on the LAN, open `http://<lan-ip>:8096`, finish the setup wizard, and add libraries:
    - Movies → `/data/movies`
    - TV → `/data/tv`
    - Music → `/data/music`  
    Put files in `movies/`, `tv/`, `music/` under your media path on the NAS.
-3. **Vaultwarden** — open `:8080`, create your account. Then set in `config.env`:
+3. **Vaultwarden** — over Tailscale, open `http://<TAILSCALE_IP>:8080`, create your account. Then set `VAULTWARDEN_SIGNUPS_ALLOWED=false` and re-run deploy or `update.sh`. Point the Bitwarden app at `http://<TAILSCALE_IP>:8080`.
 
-   ```bash
-   VAULTWARDEN_SIGNUPS_ALLOWED=false
-   ```
+## Projects stack (RabbitMQ + Registry)
 
-   and run `sudo ./scripts/03-deploy-stack.sh` again. Point the Bitwarden mobile/browser app at `http://<nas-ip>:8080` (self-hosted / custom server).
+```bash
+sudo ./scripts/05-deploy-projects.sh
+```
+
+| Service | Tailscale URL / endpoint | From other containers on `nas` |
+|---------|--------------------------|--------------------------------|
+| RabbitMQ AMQP | `<TAILSCALE_IP>:5672` | `rabbitmq:5672` |
+| RabbitMQ Management | `http://<TAILSCALE_IP>:15672` | — |
+| Registry | `http://<TAILSCALE_IP>:5000` | `registry:5000` |
+
+### RabbitMQ reliability
+
+Data lives under `$NAS_ROOT/docker/rabbitmq`. The container uses a fixed node name (`rabbit@nas` / `hostname: nas`) so recreating the container does not orphan the durable database. There is **no tight RAM cap** so home workloads can use available memory; `disk_free_limit` stops publishes if the NAS disk is nearly full.
+
+For messages that must not be lost, apps should:
+
+- Prefer **quorum queues** (or durable classic queues + persistent messages)
+- Use **publisher confirms**
+- Use **manual consumer acks** (no auto-ack for critical work)
+
+### Private registry (push / pull)
+
+On any Docker host that pushes or pulls (including this NAS if you pull by Tailscale IP), add to `/etc/docker/daemon.json` and restart Docker:
+
+```json
+{
+  "insecure-registries": ["100.92.27.123:5000"]
+}
+```
+
+Use your real `TAILSCALE_IP` if different.
+
+```bash
+docker login <TAILSCALE_IP>:5000
+docker tag myapp:latest <TAILSCALE_IP>:5000/myapp:latest
+docker push <TAILSCALE_IP>:5000/myapp:latest
+```
+
+Containers on the `nas` network can use `image: registry:5000/myapp:latest`.
+
+### Registry garbage collection
+
+Deleting tags does not free disk until GC runs. Periodically:
+
+```bash
+# Optional: delete older tags (keep REGISTRY_KEEP_TAGS newest per repo), then GC
+sudo ./scripts/06-registry-gc.sh --prune
+
+# GC only (stops registry briefly, throwaway container, starts again)
+sudo ./scripts/06-registry-gc.sh
+
+# Preview
+sudo ./scripts/06-registry-gc.sh --dry-run
+```
+
+Check usage: `du -sh "$NAS_ROOT/docker/registry"`.
 
 ## Layout on disk
 
@@ -89,6 +157,9 @@ $NAS_ROOT/
     portainer/
     jellyfin/config/
     vaultwarden/
+    rabbitmq/
+    registry/
+    registry-auth/
   media/{movies,tv,music}/
 ```
 
@@ -98,23 +169,29 @@ $NAS_ROOT/
 # Update images (preferred after first setup)
 sudo ./update.sh
 
-# Apply config.env / recreate stack (still keeps data)
+# Apply config.env / recreate core or projects
 sudo ./scripts/03-deploy-stack.sh
+sudo ./scripts/05-deploy-projects.sh
+
+# Registry cleanup
+sudo ./scripts/06-registry-gc.sh --prune
 
 # Stop containers (keeps all data)
 sudo ./scripts/uninstall-stack.sh
 
 # Logs
 cd compose && sudo docker compose --env-file .env logs -f
+cd compose/projects && sudo docker compose --env-file .env logs -f
 ```
 
 ## Notes
 
 - App state lives in bind mounts under `NAS_ROOT/docker/...`. Updating or recreating containers does **not** wipe Portainer’s admin user, Jellyfin’s library setup, or Vaultwarden passwords.
-- **Jellyfin** libraries are mounted read-only at `/data/{movies,tv,music}` inside the container.
+- **Jellyfin** libraries are mounted read-only at `/data/{movies,tv,music}` inside the container. Jellyfin ports stay on the LAN for local discovery (`8096`, `7359/udp`).
 - If you previously deployed Plex from an older revision, deploy/update removes the `plex` container automatically; your media files are untouched.
-- Scripts prefer **OMV-Extras** + `openmediavault-compose` on OpenMediaVault so you do not fight OMV’s package management. On plain Debian/Ubuntu they fall back to Docker CE.
-- This stack is for home LAN use. Add a reverse proxy + HTTPS (or Tailscale) before remote access, especially for Vaultwarden.
+- Other services bind to `TAILSCALE_IP` so they are not reachable on the LAN via Docker’s default `0.0.0.0` publish (which bypasses UFW).
+- Scripts prefer **OMV-Extras** + `openmediavault-compose` on OpenMediaVault. On plain Debian/Ubuntu they fall back to Docker CE.
+- Ensure Tailscale is up on the NAS (`tailscale up`) before deploy so binds to `TAILSCALE_IP` succeed.
 
 ## Uninstall
 
@@ -122,4 +199,4 @@ cd compose && sudo docker compose --env-file .env logs -f
 sudo ./scripts/uninstall-stack.sh
 ```
 
-Removes containers/networks only. Everything under `NAS_ROOT` stays so you can redeploy later.
+Stops projects (if present) then core. Everything under `NAS_ROOT` stays so you can redeploy later.

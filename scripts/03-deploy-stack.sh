@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generate compose/.env and bring the NAS stack up.
+# Generate compose/.env and bring the NAS core stack up.
 # Idempotent: re-run to apply config changes / pull updates.
 set -euo pipefail
 
@@ -9,6 +9,7 @@ source "${SCRIPT_DIR}/_common.sh"
 
 require_root
 load_config
+require_tailscale_ip
 
 if ! docker_ready; then
   die "Docker is not ready. Run scripts/01-install-docker.sh first."
@@ -36,10 +37,10 @@ info "Current containers"
 docker compose -f "${COMPOSE_FILE}" --env-file .env ps
 
 echo
-info "Stack deployed. On your LAN:"
-echo "  Portainer:    http://<nas-ip>:${PORTAINER_PORT}"
-echo "  Jellyfin:     http://<nas-ip>:${JELLYFIN_PORT}"
-echo "  Vaultwarden:  http://<nas-ip>:${VAULTWARDEN_PORT}"
+info "Core stack deployed (Tailscale-bound except Jellyfin):"
+echo "  Portainer:    http://${TAILSCALE_IP}:${PORTAINER_PORT}"
+echo "  Vaultwarden:  http://${TAILSCALE_IP}:${VAULTWARDEN_PORT}"
+echo "  Jellyfin (LAN): http://<lan-ip>:${JELLYFIN_PORT}"
 echo
 info "Day-to-day image updates: sudo ./update.sh  (does not re-run Docker install)"
 if [[ "${VAULTWARDEN_SIGNUPS_ALLOWED}" == "true" ]]; then

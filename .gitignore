@@ -1,6 +1,7 @@
 # Local secrets / machine-specific config
 config.env
 compose/.env
+compose/projects/.env
 
 # Editor / OS junk
 .DS_Store

@@ -14,6 +14,7 @@ source "${SCRIPT_DIR}/_common.sh"
 
 require_root
 load_config
+require_tailscale_ip
 
 if ! docker_ready; then
   die "Docker is not ready. Run setup once with ./setup.sh first."
@@ -86,6 +87,6 @@ fi
 
 echo
 info "Update finished. Portainer / Jellyfin / Vaultwarden settings and data were kept."
-echo "  Portainer:    http://<nas-ip>:${PORTAINER_PORT}"
-echo "  Jellyfin:     http://<nas-ip>:${JELLYFIN_PORT}"
-echo "  Vaultwarden:  http://<nas-ip>:${VAULTWARDEN_PORT}"
+echo "  Portainer:      http://${TAILSCALE_IP}:${PORTAINER_PORT}"
+echo "  Vaultwarden:    http://${TAILSCALE_IP}:${VAULTWARDEN_PORT}"
+echo "  Jellyfin (LAN): http://<lan-ip>:${JELLYFIN_PORT}"

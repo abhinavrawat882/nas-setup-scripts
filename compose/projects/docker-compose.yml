@@ -1,0 +1,41 @@
+# NAS projects stack: RabbitMQ + local Docker Registry
+# Shares the external "nas" network created by the core stack.
+# Host ports bind to TAILSCALE_IP only (not LAN / 0.0.0.0).
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    hostname: nas
+    restart: unless-stopped
+    environment:
+      RABBITMQ_NODENAME: rabbit@nas
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+    volumes:
+      - ${NAS_ROOT}/docker/rabbitmq:/var/lib/rabbitmq
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    ports:
+      - "${TAILSCALE_IP}:${RABBITMQ_PORT:-5672}:5672"
+      - "${TAILSCALE_IP}:${RABBITMQ_MGMT_PORT:-15672}:15672"
+    networks:
+      - nas
+
+  registry:
+    image: registry:2
+    container_name: registry
+    restart: unless-stopped
+    volumes:
+      - ${NAS_ROOT}/docker/registry:/var/lib/registry
+      - ./registry-config.yml:/etc/docker/registry/config.yml:ro
+      - ${NAS_ROOT}/docker/registry-auth:/auth:ro
+    ports:
+      - "${TAILSCALE_IP}:${REGISTRY_PORT:-5000}:5000"
+    mem_limit: 256m
+    networks:
+      - nas
+
+networks:
+  nas:
+    external: true
+    name: nas
