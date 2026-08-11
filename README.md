@@ -9,6 +9,7 @@ Idempotent scripts to put Docker on **OpenMediaVault**, then deploy:
 | **Jellyfin** | Media server | LAN `http://<lan-ip>:8096` (discovery on LAN) |
 | **RabbitMQ** | Message broker (projects stack) | Tailscale AMQP / management UI |
 | **Registry** | Private Docker registry (projects stack) | Tailscale `http://<TAILSCALE_IP>:5000` |
+| **TellegramService** | RabbitMQ → Telegram alerts (projects stack) | No host port; runs on `nas` network |
 
 Published ports (except Jellyfin) bind to **Tailscale only** so Docker does not publish on `0.0.0.0` and bypass UFW onto the LAN. Tailscale encrypts traffic on your private tailnet; it is not anonymity.
 
@@ -37,10 +38,11 @@ That runs, in order (first time only):
 
 **You do not need to run `./setup.sh` again** to update apps. Setup is idempotent and keeps bind-mounted data, but day-to-day updates should use `./update.sh` so Docker install / Portainer wizard are not part of the flow.
 
-Optional projects stack (RabbitMQ + Registry), after core is up:
+Optional projects stack (RabbitMQ + Registry + TellegramService), after core is up:
 
 ```bash
-# set RABBITMQ_* and REGISTRY_* passwords in config.env first
+# set RABBITMQ_*, REGISTRY_*, and TELEGRAM_* in config.env first
+# push tellegramservice:latest to the registry (see below), then:
 sudo ./scripts/05-deploy-projects.sh
 ```
 
@@ -77,6 +79,7 @@ After changing `config.env` (ports, signup flag, paths, Tailscale IP), either `s
 | `RABBITMQ_USER` / `RABBITMQ_PASS` | Broker credentials (change from `changeme`) |
 | `REGISTRY_USER` / `REGISTRY_PASS` | Registry basic auth (change from `changeme`) |
 | `REGISTRY_KEEP_TAGS` | Tags to keep per repo when running GC with `--prune` (default `5`) |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Bot credentials for TellegramService |
 
 `config.env` and generated `compose/.env` / `compose/projects/.env` are gitignored.
 
@@ -90,7 +93,7 @@ After changing `config.env` (ports, signup flag, paths, Tailscale IP), either `s
    Put files in `movies/`, `tv/`, `music/` under your media path on the NAS.
 3. **Vaultwarden** — over Tailscale, open `http://<TAILSCALE_IP>:8080`, create your account. Then set `VAULTWARDEN_SIGNUPS_ALLOWED=false` and re-run deploy or `update.sh`. Point the Bitwarden app at `http://<TAILSCALE_IP>:8080`.
 
-## Projects stack (RabbitMQ + Registry)
+## Projects stack (RabbitMQ + Registry + TellegramService)
 
 ```bash
 sudo ./scripts/05-deploy-projects.sh
@@ -101,6 +104,42 @@ sudo ./scripts/05-deploy-projects.sh
 | RabbitMQ AMQP | `<TAILSCALE_IP>:5672` | `rabbitmq:5672` |
 | RabbitMQ Management | `http://<TAILSCALE_IP>:15672` | — |
 | Registry | `http://<TAILSCALE_IP>:5000` | `registry:5000` |
+| TellegramService | (no host port) | container `tellegram` |
+
+Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in `config.env` before deploy (or the worker will crash-loop).
+
+### Push TellegramService image (from your Mac)
+
+Docker Desktop’s **containerd image store** ignores `insecure-registries` and fails with
+`http: server gave HTTP response to HTTPS client`. Prefer the crane-based script:
+
+```bash
+cd /path/to/TellegramService
+brew install crane   # once
+bash scripts/build-push-nas.sh
+# login: REGISTRY_USER / REGISTRY_PASS from config.env
+```
+
+Optional: Docker Desktop → Settings → General → uncheck
+**Use containerd for pulling and storing images**, then also add under
+Settings → Docker Engine:
+
+```json
+{
+  "insecure-registries": ["arnosatlas:5000", "100.92.27.123:5000"]
+}
+```
+
+Click **Apply & restart**. Editing `~/.docker/daemon.json` alone is not enough on Docker Desktop.
+
+On the NAS, pull/recreate:
+
+```bash
+sudo ./scripts/05-deploy-projects.sh
+# or: cd compose/projects && sudo docker compose --env-file .env up -d tellegram
+```
+
+Mac apps (e.g. AI Trading) publish alerts to `<TAILSCALE_IP>:5672` with the same `RABBITMQ_USER` / `RABBITMQ_PASS`.
 
 ### RabbitMQ reliability
 
@@ -114,20 +153,20 @@ For messages that must not be lost, apps should:
 
 ### Private registry (push / pull)
 
-On any Docker host that pushes or pulls (including this NAS if you pull by Tailscale IP), add to `/etc/docker/daemon.json` and restart Docker:
+On any Docker host that pushes or pulls (including this NAS if you pull by Tailscale IP **or MagicDNS hostname**), add to Docker Desktop → Settings → Docker Engine (Mac) or `/etc/docker/daemon.json` (Linux), then restart Docker:
 
 ```json
 {
-  "insecure-registries": ["100.92.27.123:5000"]
+  "insecure-registries": ["arnosatlas:5000", "100.92.27.123:5000"]
 }
 ```
 
-Use your real `TAILSCALE_IP` if different.
+Use your real Tailscale IP / MagicDNS name if different. Without this, `docker login` / `push` fails with: `http: server gave HTTP response to HTTPS client`.
 
 ```bash
-docker login <TAILSCALE_IP>:5000
-docker tag myapp:latest <TAILSCALE_IP>:5000/myapp:latest
-docker push <TAILSCALE_IP>:5000/myapp:latest
+docker login arnosatlas:5000
+docker tag myapp:latest arnosatlas:5000/myapp:latest
+docker push arnosatlas:5000/myapp:latest
 ```
 
 Containers on the `nas` network can use `image: registry:5000/myapp:latest`.

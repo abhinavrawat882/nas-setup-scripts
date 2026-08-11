@@ -2,6 +2,7 @@
 config.env
 compose/.env
 compose/projects/.env
+telegram.env.local
 
 # Editor / OS junk
 .DS_Store

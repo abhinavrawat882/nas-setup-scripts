@@ -1,4 +1,4 @@
-# NAS projects stack: RabbitMQ + local Docker Registry
+# NAS projects stack: RabbitMQ + local Docker Registry + TellegramService
 # Shares the external "nas" network created by the core stack.
 # Host ports bind to TAILSCALE_IP only (not LAN / 0.0.0.0).
 
@@ -18,6 +18,11 @@ services:
     ports:
       - "${TAILSCALE_IP}:${RABBITMQ_PORT:-5672}:5672"
       - "${TAILSCALE_IP}:${RABBITMQ_MGMT_PORT:-15672}:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - nas
 
@@ -32,6 +37,29 @@ services:
     ports:
       - "${TAILSCALE_IP}:${REGISTRY_PORT:-5000}:5000"
     mem_limit: 256m
+    networks:
+      - nas
+
+  # Image must be pushed first: <TAILSCALE_IP>:5000/tellegramservice:latest
+  # On the nas network, pull via registry:5000 (same registry container).
+  tellegram:
+    image: registry:5000/tellegramservice:latest
+    container_name: tellegram
+    restart: unless-stopped
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: "5672"
+      RabbitMq__UserName: ${RABBITMQ_USER}
+      RabbitMq__Password: ${RABBITMQ_PASS}
+      RabbitMq__Exchange: alerts
+      RabbitMq__Queue: telegram.alerts
+      RabbitMq__RoutingKey: "alert.#"
+      Telegram__BotToken: ${TELEGRAM_BOT_TOKEN}
+      Telegram__ChatId: ${TELEGRAM_CHAT_ID}
+      Telegram__ParseMode: HTML
     networks:
       - nas
 
