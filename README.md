@@ -103,10 +103,12 @@ sudo ./scripts/05-deploy-projects.sh
 |---------|--------------------------|--------------------------------|
 | RabbitMQ AMQP | `<TAILSCALE_IP>:5672` | `rabbitmq:5672` |
 | RabbitMQ Management | `http://<TAILSCALE_IP>:15672` | — |
-| Registry | `http://<TAILSCALE_IP>:5000` | `registry:5000` |
+| Registry | `http://<TAILSCALE_IP>:5000` | `registry:5000` (in-network only) |
 | TellegramService | (no host port) | container `tellegram` |
 
 Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in `config.env` before deploy (or the worker will crash-loop).
+
+Image pulls use **`${TAILSCALE_IP}:5000/...`** on the Docker host (not the compose DNS name `registry`). `05-deploy-projects.sh` adds that endpoint to `/etc/docker/daemon.json` `insecure-registries` automatically.
 
 ### Push TellegramService image (from your Mac)
 
@@ -163,13 +165,15 @@ On any Docker host that pushes or pulls (including this NAS if you pull by Tails
 
 Use your real Tailscale IP / MagicDNS name if different. Without this, `docker login` / `push` fails with: `http: server gave HTTP response to HTTPS client`.
 
+On the NAS, `scripts/05-deploy-projects.sh` writes `${TAILSCALE_IP}:${REGISTRY_PORT}` into `/etc/docker/daemon.json` for you.
+
 ```bash
-docker login arnosatlas:5000
-docker tag myapp:latest arnosatlas:5000/myapp:latest
-docker push arnosatlas:5000/myapp:latest
+docker login <TAILSCALE_IP>:5000
+docker tag myapp:latest <TAILSCALE_IP>:5000/myapp:latest
+docker push <TAILSCALE_IP>:5000/myapp:latest
 ```
 
-Containers on the `nas` network can use `image: registry:5000/myapp:latest`.
+Compose services that pull local images must use `image: ${TAILSCALE_IP}:5000/myapp:latest` — the hostname `registry` only resolves **inside** containers on the `nas` network, not for host-side `docker pull`.
 
 ### Registry garbage collection
 

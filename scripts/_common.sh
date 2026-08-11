@@ -149,3 +149,54 @@ ensure_registry_htpasswd() {
   chmod 600 "${htpasswd_file}"
   chown root:root "${htpasswd_file}"
 }
+
+# Docker pulls images on the host. Private registry is HTTP-only, so the host
+# must list ${TAILSCALE_IP}:${REGISTRY_PORT} under insecure-registries.
+ensure_insecure_registry() {
+  local endpoint="${TAILSCALE_IP}:${REGISTRY_PORT}"
+  local daemon_json="/etc/docker/daemon.json"
+  local tmp
+  tmp="$(mktemp)"
+
+  if [[ ! -f "${daemon_json}" ]]; then
+    echo '{}' >"${daemon_json}"
+  fi
+
+  if ! python3 - "${daemon_json}" "${endpoint}" "${tmp}" <<'PY'
+import json, sys
+path, endpoint, out = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(path) as f:
+    data = json.load(f)
+regs = list(data.get("insecure-registries") or [])
+changed = False
+if endpoint not in regs:
+    regs.append(endpoint)
+    changed = True
+data["insecure-registries"] = regs
+with open(out, "w") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+sys.exit(0 if changed else 1)
+PY
+  then
+    info "insecure-registries already includes ${endpoint}"
+    rm -f "${tmp}"
+    return 0
+  fi
+
+  info "Adding ${endpoint} to ${daemon_json} insecure-registries"
+  cp "${tmp}" "${daemon_json}"
+  rm -f "${tmp}"
+  chmod 644 "${daemon_json}"
+  info "Restarting Docker to apply insecure-registries"
+  systemctl restart docker
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    if docker_ready; then
+      break
+    fi
+    sleep 2
+  done
+  if ! docker_ready; then
+    die "Docker did not come back after restarting for insecure-registries"
+  fi
+}

@@ -28,22 +28,32 @@ fi
 
 "${SCRIPT_DIR}/02-prepare-dirs.sh"
 ensure_registry_htpasswd
+ensure_insecure_registry
 write_projects_compose_env
 
 COMPOSE_FILE="${REPO_ROOT}/compose/projects/docker-compose.yml"
 ENV_FILE="${REPO_ROOT}/compose/projects/.env"
+TELLEGRAM_IMAGE="${TAILSCALE_IP}:${REGISTRY_PORT}/tellegramservice:latest"
 cd "${REPO_ROOT}/compose/projects"
 
-info "Pulling images (tellegram needs a prior push to ${TAILSCALE_IP}:${REGISTRY_PORT}/tellegramservice)"
-# RabbitMQ + registry always pull; tellegram may be missing until first push — allow soft fail
+info "Pulling RabbitMQ + Registry images"
 docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" pull rabbitmq registry || true
-if ! docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" pull tellegram; then
-  warn "Could not pull registry:5000/tellegramservice:latest"
-  warn "Build/push from your Mac first, then re-run this script."
-fi
 
-info "Starting projects stack (${PROJECTS_COMPOSE_PROJECT_NAME})"
-docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d
+info "Starting RabbitMQ + Registry first (${PROJECTS_COMPOSE_PROJECT_NAME})"
+docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d rabbitmq registry
+
+info "Logging into private registry ${TAILSCALE_IP}:${REGISTRY_PORT}"
+echo "${REGISTRY_PASS}" | docker login "${TAILSCALE_IP}:${REGISTRY_PORT}" \
+  -u "${REGISTRY_USER}" --password-stdin
+
+info "Pulling ${TELLEGRAM_IMAGE}"
+if docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" pull tellegram; then
+  info "Starting TellegramService"
+  docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d tellegram
+else
+  warn "Could not pull ${TELLEGRAM_IMAGE}"
+  warn "Push from your Mac first (bash scripts/build-push-nas.sh), then re-run this script."
+fi
 
 info "Current containers"
 docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" ps
@@ -54,6 +64,7 @@ echo "  RabbitMQ AMQP:       ${TAILSCALE_IP}:${RABBITMQ_PORT}"
 echo "  RabbitMQ Management: http://${TAILSCALE_IP}:${RABBITMQ_MGMT_PORT}"
 echo "  Registry:            http://${TAILSCALE_IP}:${REGISTRY_PORT}"
 echo "  TellegramService:    container 'tellegram' on nas network (no host port)"
+echo "  Tellegram image:     ${TELLEGRAM_IMAGE}"
 echo
 echo "  On the nas Docker network: rabbitmq:5672 , registry:5000 , tellegram"
 echo "  Reclaim registry disk later: sudo ./scripts/06-registry-gc.sh"

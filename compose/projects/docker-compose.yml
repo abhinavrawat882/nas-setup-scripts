@@ -40,10 +40,11 @@ services:
     networks:
       - nas
 
-  # Image must be pushed first: <TAILSCALE_IP>:5000/tellegramservice:latest
-  # On the nas network, pull via registry:5000 (same registry container).
+  # Image must be pushed first from Mac (crane/docker) to this registry.
+  # Pulls happen on the Docker *host*, so use Tailscale IP — not the
+  # compose service name "registry" (that only resolves inside the nas network).
   tellegram:
-    image: registry:5000/tellegramservice:latest
+    image: ${TAILSCALE_IP}:${REGISTRY_PORT:-5000}/tellegramservice:latest
     container_name: tellegram
     restart: unless-stopped
     depends_on:
