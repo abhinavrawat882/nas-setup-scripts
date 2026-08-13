@@ -5,6 +5,8 @@ cache:
   cache_dir: data/stocks_cache
   historical_days: 365
   refresh_eod: true
+  # Yahoo rate-limits NAS/datacenter IPs; raise if you still see YFRateLimitError
+  download_pause_seconds: 0.6
 
 report:
   output_dir: data/reports
@@ -33,15 +35,19 @@ tax:
   stcg_rate: 0.20
   ltcg_rate: 0.125
   ltcg_exemption_yearly: 125000
+  stt_buy_rate: 0.001
   stt_sell_rate: 0.001
   stamp_duty_buy_rate: 0.00015
   exchange_charge_rate: 0.0000345
+  sebi_turnover_rate: 0.000001
   gst_on_charges_rate: 0.18
 
 fees:
   delivery_brokerage_zero: true
   groww_brokerage_per_order: 20
   groww_brokerage_pct: 0.0005
+  groww_min_brokerage: 5
+  dp_charges_per_scrip: 20
 
 gemini:
   enabled: false
