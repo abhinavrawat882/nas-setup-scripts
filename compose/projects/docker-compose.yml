@@ -80,6 +80,7 @@ services:
       HOST: "0.0.0.0"
       PORT: "5000"
       TZ: ${TZ:-Asia/Kolkata}
+      LOG_LEVEL: ${AI_TRADING_LOG_LEVEL:-INFO}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       ALERTS_RABBITMQ_HOST: rabbitmq
       ALERTS_RABBITMQ_USER: ${RABBITMQ_USER}
