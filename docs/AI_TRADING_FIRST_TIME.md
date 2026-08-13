@@ -119,7 +119,8 @@ script is the supported “first run” path. Folders are also created by
 | Symptom | Fix |
 |---------|-----|
 | `:5100` connection refused | Image not pulled / container not started — run `--deploy`; check `docker ps \| grep ai-trading` |
-| Container exits immediately | Missing or bad `config.yaml` — re-run setup script, then `docker logs ai-trading` |
+| Container exits / `Restarting` | Wrong arch image (need `linux/amd64`) — rebuild with `./scripts/build-push-nas.sh`; check `docker logs ai-trading` |
+| `sed: unterminated s` on setup | Fixed — pull latest `07-setup-ai-trading.sh`; re-run with `--force` if config is empty/broken |
 | No Telegram | `tellegram` up? `alerts.enabled`? RabbitMQ password match? |
 | Report link doesn’t open | Phone on Tailscale? URL host = NAS Tailscale IP/MagicDNS |
 | Wrong schedule time | Set `TZ=Asia/Kolkata` in `config.env`, redeploy |

@@ -69,6 +69,7 @@ services:
   # Place config.yaml under ${NAS_ROOT}/docker/ai-trading/config.yaml
   ai-trading:
     image: ${TAILSCALE_IP}:${REGISTRY_PORT:-5000}/ai-trading:latest
+    platform: linux/amd64
     container_name: ai-trading
     restart: unless-stopped
     working_dir: /app

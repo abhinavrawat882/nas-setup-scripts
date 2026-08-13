@@ -60,16 +60,17 @@ if [[ -f "${AI_CFG}" && "${FORCE}" -ne 1 ]]; then
   info "Config already exists: ${AI_CFG} (pass --force to overwrite)"
 else
   info "Writing ${AI_CFG} from template (RabbitMQ creds from config.env)"
-  # Escape sed replacement strings
-  esc() { printf '%s' "$1" | sed -e 's/[\\/&|]/g'; }
-  USER_ESC="$(esc "${RABBITMQ_USER}")"
-  PASS_ESC="$(esc "${RABBITMQ_PASS}")"
-  URL_ESC="$(esc "${DASHBOARD_URL}")"
-  sed \
-    -e "s|__RABBITMQ_USER__|${USER_ESC}|g" \
-    -e "s|__RABBITMQ_PASS__|${PASS_ESC}|g" \
-    -e "s|__DASHBOARD_BASE_URL__|${URL_ESC}|g" \
-    "${EXAMPLE}" > "${AI_CFG}"
+  # Use Python for safe substitution (passwords may contain sed-special chars)
+  python3 - "${EXAMPLE}" "${AI_CFG}" \
+    "${RABBITMQ_USER}" "${RABBITMQ_PASS}" "${DASHBOARD_URL}" <<'PY'
+import sys
+src, dst, user, password, url = sys.argv[1:6]
+text = open(src, encoding="utf-8").read()
+text = text.replace("__RABBITMQ_USER__", user)
+text = text.replace("__RABBITMQ_PASS__", password)
+text = text.replace("__DASHBOARD_BASE_URL__", url)
+open(dst, "w", encoding="utf-8").write(text)
+PY
   chmod 600 "${AI_CFG}"
 fi
 
