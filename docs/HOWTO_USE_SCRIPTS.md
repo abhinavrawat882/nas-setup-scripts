@@ -30,6 +30,7 @@ Data under `/srv/nas/docker/…` and `/srv/nas/media/…` is **bind-mounted**. U
 | `./update.sh` [name] | Day-to-day **core** image updates (`jellyfin`, `portainer`, `vaultwarden`) |
 | `scripts/05-deploy-projects.sh` | (Re)start **projects**: RabbitMQ, Registry, Tellegram, AI Trading |
 | `scripts/07-setup-ai-trading.sh` | First-time AI Trading dirs + seed config (+ optional `--deploy`) |
+| `scripts/08-deploy-logging.sh` | Deploy **Loki + Grafana + Alloy** (shared container logs) |
 | `scripts/06-registry-gc.sh` | Free registry disk (optional `--prune`) |
 | `scripts/uninstall-stack.sh` | Stop/remove containers; **keeps** data on disk |
 
@@ -37,6 +38,7 @@ Related docs:
 
 - [AI_TRADING_FIRST_TIME.md](AI_TRADING_FIRST_TIME.md)
 - [PUSH_IMAGES_FROM_MAC.md](PUSH_IMAGES_FROM_MAC.md)
+- [LOGGING.md](LOGGING.md) — Loki + Grafana setup and queries
 
 ---
 
@@ -233,6 +235,8 @@ sudo docker compose --env-file .env up -d tellegram
 | Overwrite AI Trading config from template | `sudo ./scripts/07-setup-ai-trading.sh --force` then `sudo nano …` |
 | Turn off Vaultwarden signups | Set `VAULTWARDEN_SIGNUPS_ALLOWED=false` in `config.env` → `sudo ./update.sh vaultwarden` |
 | Free registry disk | `sudo ./scripts/06-registry-gc.sh --prune` |
+| Deploy shared logging (Loki/Grafana) | `sudo ./scripts/08-deploy-logging.sh` — see [LOGGING.md](LOGGING.md) |
+| See AI Trading logs in Grafana | Explore → `{container="ai-trading"}` |
 | See what’s running | `docker ps` or Portainer |
 | Logs | `docker logs -f ai-trading` / `tellegram` / `rabbitmq` |
 | Stop everything, keep data | `sudo ./scripts/uninstall-stack.sh` |
@@ -249,6 +253,7 @@ sudo docker compose --env-file .env up -d tellegram
 | RabbitMQ management | http://arnosatlas:15672 |
 | Registry | http://arnosatlas:5000 |
 | AI Trading | http://arnosatlas:5100 |
+| Grafana (logs) | http://arnosatlas:3000 |
 | Jellyfin | http://\<lan-ip\>:8096 |
 
 ---

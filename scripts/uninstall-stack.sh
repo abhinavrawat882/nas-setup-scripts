@@ -11,8 +11,21 @@ load_config
 
 PROJECTS_COMPOSE="${REPO_ROOT}/compose/projects/docker-compose.yml"
 PROJECTS_ENV="${REPO_ROOT}/compose/projects/.env"
+LOGGING_COMPOSE="${REPO_ROOT}/compose/logging/docker-compose.yml"
+LOGGING_ENV="${REPO_ROOT}/compose/logging/.env"
 CORE_COMPOSE="${REPO_ROOT}/compose/docker-compose.yml"
 CORE_ENV="${REPO_ROOT}/compose/.env"
+
+if [[ -f "${LOGGING_ENV}" ]] || docker inspect loki >/dev/null 2>&1 || docker inspect grafana >/dev/null 2>&1; then
+  if [[ ! -f "${LOGGING_ENV}" ]]; then
+    write_logging_compose_env
+  fi
+  info "Stopping logging stack (${LOGGING_COMPOSE_PROJECT_NAME}) — data preserved"
+  cd "${REPO_ROOT}/compose/logging"
+  docker compose -f "${LOGGING_COMPOSE}" --env-file "${LOGGING_ENV}" down || warn "Logging stack down returned non-zero"
+else
+  info "Logging stack not present; skipping"
+fi
 
 if [[ -f "${PROJECTS_ENV}" ]] || docker inspect rabbitmq >/dev/null 2>&1 || docker inspect registry >/dev/null 2>&1; then
   if [[ ! -f "${PROJECTS_ENV}" ]]; then

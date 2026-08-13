@@ -1,0 +1,66 @@
+# NAS logging stack: Loki + Grafana + Alloy
+# Collects stdout/stderr from all Docker containers on this host.
+# Grafana UI binds to Tailscale only.
+#
+# Deploy: sudo ./scripts/08-deploy-logging.sh
+
+services:
+  loki:
+    image: grafana/loki:3.4.2
+    container_name: loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/config.yml
+    volumes:
+      - ${NAS_ROOT}/docker/loki:/loki
+      - ./loki-config.yml:/etc/loki/config.yml:ro
+    # No host port — only Alloy/Grafana on the nas network talk to Loki.
+    networks:
+      - nas
+    mem_limit: 512m
+
+  alloy:
+    image: grafana/alloy:v1.7.1
+    container_name: alloy
+    restart: unless-stopped
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+      - --server.http.listen-addr=0.0.0.0:12345
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./alloy-config.alloy:/etc/alloy/config.alloy:ro
+      - ${NAS_ROOT}/docker/alloy:/var/lib/alloy/data
+    depends_on:
+      - loki
+    networks:
+      - nas
+    mem_limit: 256m
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-UTC}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-changeme}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: http://${TAILSCALE_IP}:${GRAFANA_PORT:-3000}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_LOG_MODE: console
+    volumes:
+      - ${NAS_ROOT}/docker/grafana:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "${TAILSCALE_IP}:${GRAFANA_PORT:-3000}:3000"
+    depends_on:
+      - loki
+    networks:
+      - nas
+    mem_limit: 256m
+
+networks:
+  nas:
+    external: true
+    name: nas

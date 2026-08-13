@@ -20,6 +20,9 @@ dirs=(
   "${NAS_ROOT}/docker/ai-trading/data/portfolio"
   "${NAS_ROOT}/docker/ai-trading/data/stocks_cache"
   "${NAS_ROOT}/docker/ai-trading/data/reports"
+  "${NAS_ROOT}/docker/loki"
+  "${NAS_ROOT}/docker/alloy"
+  "${NAS_ROOT}/docker/grafana"
   "${MEDIA_PATH}/movies"
   "${MEDIA_PATH}/tv"
   "${MEDIA_PATH}/music"
@@ -46,5 +49,10 @@ chown -R root:root "${NAS_ROOT}/docker/registry-auth"
 chown -R 999:999 "${NAS_ROOT}/docker/rabbitmq"
 # Registry runs as root by default in registry:2
 chown -R root:root "${NAS_ROOT}/docker/registry"
+
+# Loki / Grafana official image UIDs
+mkdir -p "${NAS_ROOT}/docker/loki" "${NAS_ROOT}/docker/grafana" "${NAS_ROOT}/docker/alloy"
+chown -R 10001:10001 "${NAS_ROOT}/docker/loki" || true
+chown -R 472:472 "${NAS_ROOT}/docker/grafana" || true
 
 info "Directory layout ready"

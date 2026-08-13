@@ -14,7 +14,7 @@ Idempotent scripts to put Docker on **OpenMediaVault**, then deploy:
 
 **Operator guide (start here):** **[docs/HOWTO_USE_SCRIPTS.md](docs/HOWTO_USE_SCRIPTS.md)** — first-time setup, updates, update one service, AI Trading, recipes.
 
-Also: [AI Trading first-time](docs/AI_TRADING_FIRST_TIME.md) · [Push images from Mac](docs/PUSH_IMAGES_FROM_MAC.md)
+Also: [AI Trading first-time](docs/AI_TRADING_FIRST_TIME.md) · [Push images from Mac](docs/PUSH_IMAGES_FROM_MAC.md) · [Logging (Loki/Grafana)](docs/LOGGING.md)
 
 Published ports (except Jellyfin) bind to **Tailscale only** so Docker does not publish on `0.0.0.0` and bypass UFW onto the LAN. Tailscale encrypts traffic on your private tailnet; it is not anonymity.
 
