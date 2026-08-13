@@ -17,6 +17,9 @@ dirs=(
   "${NAS_ROOT}/docker/rabbitmq"
   "${NAS_ROOT}/docker/registry"
   "${NAS_ROOT}/docker/registry-auth"
+  "${NAS_ROOT}/docker/ai-trading/data/portfolio"
+  "${NAS_ROOT}/docker/ai-trading/data/stocks_cache"
+  "${NAS_ROOT}/docker/ai-trading/data/reports"
   "${MEDIA_PATH}/movies"
   "${MEDIA_PATH}/tv"
   "${MEDIA_PATH}/music"
@@ -32,6 +35,7 @@ info "Setting ownership to ${PUID}:${PGID}"
 chown -R "${PUID}:${PGID}" \
   "${NAS_ROOT}/docker/jellyfin" \
   "${NAS_ROOT}/docker/vaultwarden" \
+  "${NAS_ROOT}/docker/ai-trading" \
   "${MEDIA_PATH}"
 
 # Portainer / registry auth run as root inside containers; RabbitMQ image uses rabbitmq user (999).

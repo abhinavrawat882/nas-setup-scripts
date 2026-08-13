@@ -55,6 +55,23 @@ else
   warn "Push from your Mac first (bash scripts/build-push-nas.sh), then re-run this script."
 fi
 
+AI_TRADING_IMAGE="${TAILSCALE_IP}:${REGISTRY_PORT}/ai-trading:latest"
+AI_CFG="${NAS_ROOT}/docker/ai-trading/config.yaml"
+if [[ ! -f "${AI_CFG}" ]]; then
+  warn "Missing ${AI_CFG}"
+  warn "First-time: sudo ./scripts/07-setup-ai-trading.sh   # creates folders + seeds config"
+fi
+
+info "Pulling ${AI_TRADING_IMAGE}"
+if docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" pull ai-trading; then
+  info "Starting AI Trading Advisor + Ofelia scheduler"
+  docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d ai-trading ai-trading-ofelia
+else
+  warn "Could not pull ${AI_TRADING_IMAGE}"
+  warn "On your Mac (AI Trading repo): ./scripts/build-push-nas.sh"
+  warn "Then on NAS: sudo ./scripts/07-setup-ai-trading.sh --deploy"
+fi
+
 info "Current containers"
 docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" ps
 
@@ -65,6 +82,9 @@ echo "  RabbitMQ Management: http://${TAILSCALE_IP}:${RABBITMQ_MGMT_PORT}"
 echo "  Registry:            http://${TAILSCALE_IP}:${REGISTRY_PORT}"
 echo "  TellegramService:    container 'tellegram' on nas network (no host port)"
 echo "  Tellegram image:     ${TELLEGRAM_IMAGE}"
+echo "  AI Trading:          http://${TAILSCALE_IP}:${AI_TRADING_PORT:-5100}"
+echo "  AI Trading image:    ${AI_TRADING_IMAGE}"
+echo "  Schedule:            Mon–Fri 07:00 and 19:00 (${TZ})"
 echo
-echo "  On the nas Docker network: rabbitmq:5672 , registry:5000 , tellegram"
+echo "  On the nas Docker network: rabbitmq:5672 , registry:5000 , tellegram , ai-trading"
 echo "  Reclaim registry disk later: sudo ./scripts/06-registry-gc.sh"

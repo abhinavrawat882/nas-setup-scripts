@@ -10,6 +10,11 @@ Idempotent scripts to put Docker on **OpenMediaVault**, then deploy:
 | **RabbitMQ** | Message broker (projects stack) | Tailscale AMQP / management UI |
 | **Registry** | Private Docker registry (projects stack) | Tailscale `http://<TAILSCALE_IP>:5000` |
 | **TellegramService** | RabbitMQ → Telegram alerts (projects stack) | No host port; runs on `nas` network |
+| **AI Trading** | Portfolio editor + scheduled advisor (projects stack) | Tailscale `http://<TAILSCALE_IP>:5100` |
+
+**Operator guide (start here):** **[docs/HOWTO_USE_SCRIPTS.md](docs/HOWTO_USE_SCRIPTS.md)** — first-time setup, updates, update one service, AI Trading, recipes.
+
+Also: [AI Trading first-time](docs/AI_TRADING_FIRST_TIME.md) · [Push images from Mac](docs/PUSH_IMAGES_FROM_MAC.md)
 
 Published ports (except Jellyfin) bind to **Tailscale only** so Docker does not publish on `0.0.0.0` and bypass UFW onto the LAN. Tailscale encrypts traffic on your private tailnet; it is not anonymity.
 
@@ -48,6 +53,8 @@ sudo ./scripts/05-deploy-projects.sh
 
 ## Updating containers later
 
+Full recipes (first-time vs update-all vs one service): **[docs/HOWTO_USE_SCRIPTS.md](docs/HOWTO_USE_SCRIPTS.md)**.
+
 Pull newer images and recreate containers. **Portainer login, Jellyfin config/libraries, and Vaultwarden vault stay on disk** under `NAS_ROOT` — only the container image/layers are refreshed.
 
 ```bash
@@ -80,6 +87,8 @@ After changing `config.env` (ports, signup flag, paths, Tailscale IP), either `s
 | `REGISTRY_USER` / `REGISTRY_PASS` | Registry basic auth (change from `changeme`) |
 | `REGISTRY_KEEP_TAGS` | Tags to keep per repo when running GC with `--prune` (default `5`) |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Bot credentials for TellegramService |
+| `AI_TRADING_PORT` | Tailscale port for AI Trading dashboard (default `5100`) |
+| `GEMINI_API_KEY` | Optional; passed into the ai-trading container |
 
 `config.env` and generated `compose/.env` / `compose/projects/.env` are gitignored.
 
@@ -93,7 +102,7 @@ After changing `config.env` (ports, signup flag, paths, Tailscale IP), either `s
    Put files in `movies/`, `tv/`, `music/` under your media path on the NAS.
 3. **Vaultwarden** — over Tailscale, open `http://<TAILSCALE_IP>:8080`, create your account. Then set `VAULTWARDEN_SIGNUPS_ALLOWED=false` and re-run deploy or `update.sh`. Point the Bitwarden app at `http://<TAILSCALE_IP>:8080`.
 
-## Projects stack (RabbitMQ + Registry + TellegramService)
+## Projects stack (RabbitMQ + Registry + TellegramService + AI Trading)
 
 ```bash
 sudo ./scripts/05-deploy-projects.sh
@@ -102,37 +111,41 @@ sudo ./scripts/05-deploy-projects.sh
 | Service | Tailscale URL / endpoint | From other containers on `nas` |
 |---------|--------------------------|--------------------------------|
 | RabbitMQ AMQP | `<TAILSCALE_IP>:5672` | `rabbitmq:5672` |
-| RabbitMQ Management | `http://<TAILSCALE_IP>:15672` | — |
-| Registry | `http://<TAILSCALE_IP>:5000` | `registry:5000` (in-network only) |
+| RabbitMQ Management | http://`<TAILSCALE_IP>`:15672 | — |
+| Registry | http://`<TAILSCALE_IP>`:5000 | `registry:5000` (in-network only) |
 | TellegramService | (no host port) | container `tellegram` |
+| AI Trading Advisor | http://`<TAILSCALE_IP>`:5100 | container `ai-trading` |
 
 Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in `config.env` before deploy (or the worker will crash-loop).
+
+Optional AI Trading: see **[docs/AI_TRADING_FIRST_TIME.md](docs/AI_TRADING_FIRST_TIME.md)**.
+
+Short path (NAS already has RabbitMQ/Registry/Tellegram):
+
+```bash
+# Mac — push image
+cd "/Users/arno/Documents/Projects/AI Trading" && ./scripts/build-push-nas.sh
+
+# NAS — create /srv/nas/docker/ai-trading + seed config, then edit
+sudo ./scripts/07-setup-ai-trading.sh
+sudo nano /srv/nas/docker/ai-trading/config.yaml   # capital, holds
+sudo ./scripts/07-setup-ai-trading.sh --deploy
+```
+
+Dashboard: `http://<TAILSCALE_IP>:5100`. Ofelia: Mon–Fri 07:00 / 19:00 (`TZ`; prefer `Asia/Kolkata`).
 
 Image pulls use **`${TAILSCALE_IP}:5000/...`** on the Docker host (not the compose DNS name `registry`). `05-deploy-projects.sh` adds that endpoint to `/etc/docker/daemon.json` `insecure-registries` automatically.
 
 ### Push TellegramService image (from your Mac)
 
-Docker Desktop’s **containerd image store** ignores `insecure-registries` and fails with
-`http: server gave HTTP response to HTTPS client`. Prefer the crane-based script:
+See **[docs/PUSH_IMAGES_FROM_MAC.md](docs/PUSH_IMAGES_FROM_MAC.md)** for the shared Mac → NAS registry
+workflow (`crane --insecure`). Docker Desktop `docker push` usually fails against this HTTP registry.
 
 ```bash
 cd /path/to/TellegramService
 brew install crane   # once
 bash scripts/build-push-nas.sh
-# login: REGISTRY_USER / REGISTRY_PASS from config.env
 ```
-
-Optional: Docker Desktop → Settings → General → uncheck
-**Use containerd for pulling and storing images**, then also add under
-Settings → Docker Engine:
-
-```json
-{
-  "insecure-registries": ["arnosatlas:5000", "100.92.27.123:5000"]
-}
-```
-
-Click **Apply & restart**. Editing `~/.docker/daemon.json` alone is not enough on Docker Desktop.
 
 On the NAS, pull/recreate:
 
@@ -142,6 +155,25 @@ sudo ./scripts/05-deploy-projects.sh
 ```
 
 Mac apps (e.g. AI Trading) publish alerts to `<TAILSCALE_IP>:5672` with the same `RABBITMQ_USER` / `RABBITMQ_PASS`.
+
+### Push AI Trading image (from your Mac)
+
+```bash
+cd "/Users/arno/Documents/Projects/AI Trading"
+./scripts/build-push-nas.sh
+```
+
+First-time on NAS (creates `/srv/nas/docker/ai-trading`, seeds config, tells you what to nano):
+
+```bash
+sudo ./scripts/07-setup-ai-trading.sh
+sudo nano /srv/nas/docker/ai-trading/config.yaml
+sudo ./scripts/07-setup-ai-trading.sh --deploy
+```
+
+Full walkthrough: **[docs/AI_TRADING_FIRST_TIME.md](docs/AI_TRADING_FIRST_TIME.md)**
+
+Dashboard: `http://<TAILSCALE_IP>:5100` — Portfolio page edits holdings; Telegram alerts include a Tailscale link to the HTML report. Schedule: Mon–Fri 07:00 and 19:00 (`TZ` in config.env; prefer `Asia/Kolkata`).
 
 ### RabbitMQ reliability
 
@@ -203,6 +235,9 @@ $NAS_ROOT/
     rabbitmq/
     registry/
     registry-auth/
+    ai-trading/
+      config.yaml
+      data/{portfolio,stocks_cache,reports}/
   media/{movies,tv,music}/
 ```
 

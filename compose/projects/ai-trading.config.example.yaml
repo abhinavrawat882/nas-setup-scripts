@@ -1,0 +1,71 @@
+# Seeded by scripts/07-setup-ai-trading.sh → ${NAS_ROOT}/docker/ai-trading/config.yaml
+# Edit capital + long_term_holds after first copy. RabbitMQ password is filled from config.env.
+
+cache:
+  cache_dir: data/stocks_cache
+  historical_days: 365
+  refresh_eod: true
+
+report:
+  output_dir: data/reports
+  auto_open_browser: false
+  keep_last_n_reports: 30
+
+strategy_profile: balanced
+
+strategy:
+  momentum_breakout: true
+  pullback_to_support: true
+  watchlist_size: 60
+
+risk:
+  min_risk_reward_ratio: 2.0
+  max_loss_per_trade_pct: 0.08
+  max_open_positions: 5
+
+capital:
+  monthly_allocation: 20000          # ← edit: Groww cash / monthly budget (INR)
+  existing_portfolio_value: 0        # ← optional
+  max_position_size: 15000
+  min_position_size: 5000
+
+tax:
+  stcg_rate: 0.20
+  ltcg_rate: 0.125
+  ltcg_exemption_yearly: 125000
+  stt_sell_rate: 0.001
+  stamp_duty_buy_rate: 0.00015
+  exchange_charge_rate: 0.0000345
+  gst_on_charges_rate: 0.18
+
+fees:
+  delivery_brokerage_zero: true
+  groww_brokerage_per_order: 20
+  groww_brokerage_pct: 0.0005
+
+gemini:
+  enabled: false
+  api_key: ""
+
+portfolio:
+  data_file: data/portfolio/portfolio.csv
+  trades_log: data/portfolio/portfolio_trades.json
+  long_term_holds: []                # ← e.g. ["ITC", "SBIN"]
+
+alerts:
+  enabled: true
+  dashboard_base_url: "__DASHBOARD_BASE_URL__"
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: "__RABBITMQ_USER__"
+    password: "__RABBITMQ_PASS__"
+    exchange: alerts
+    routing_key_prefix: alert
+  max_buys: 5
+  max_sells: 5
+
+scheduler:
+  morning_briefing_time: "07:00"
+  evening_analysis_time: "19:00"
+  trading_days: [1, 2, 3, 4, 5]
