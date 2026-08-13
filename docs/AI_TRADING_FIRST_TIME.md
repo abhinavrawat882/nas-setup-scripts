@@ -124,3 +124,17 @@ script is the supported “first run” path. Folders are also created by
 | No Telegram | `tellegram` up? `alerts.enabled`? RabbitMQ password match? |
 | Report link doesn’t open | Phone on Tailscale? URL host = NAS Tailscale IP/MagicDNS |
 | Wrong schedule time | Set `TZ=Asia/Kolkata` in `config.env`, redeploy |
+
+---
+
+## Viewing logs (Grafana / Loki)
+
+Recommended instead of only `docker logs`:
+
+```bash
+sudo ./scripts/08-deploy-logging.sh
+```
+
+Then open `http://arnosatlas:3000` → Explore → `{container="ai-trading"}`.
+
+Full guide: [LOGGING.md](LOGGING.md)

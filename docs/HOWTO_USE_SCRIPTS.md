@@ -114,6 +114,18 @@ sudo ./scripts/07-setup-ai-trading.sh --deploy
 
 Open: `http://arnosatlas:5100`
 
+### Step E — logging stack (recommended)
+
+Shared logs for every container (AI Trading, Tellegram, RabbitMQ, …):
+
+```bash
+# config.env: GRAFANA_ADMIN_PASSWORD=...
+sudo ./scripts/08-deploy-logging.sh
+```
+
+Open: `http://arnosatlas:3000` → Explore → `{container="ai-trading"}`  
+Details: [LOGGING.md](LOGGING.md)
+
 **You do not run `./setup.sh` again** for normal updates.
 
 ---
@@ -146,6 +158,14 @@ sudo ./update.sh --prune  # also delete unused old images
 ```bash
 sudo ./scripts/05-deploy-projects.sh
 ```
+
+### Logging stack (Loki, Grafana, Alloy)
+
+```bash
+sudo ./scripts/08-deploy-logging.sh
+```
+
+See [LOGGING.md](LOGGING.md).
 
 This rewrites `compose/projects/.env` from `config.env`, pulls images it can, and recreates containers. Bind mounts stay.
 

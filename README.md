@@ -11,6 +11,7 @@ Idempotent scripts to put Docker on **OpenMediaVault**, then deploy:
 | **Registry** | Private Docker registry (projects stack) | Tailscale `http://<TAILSCALE_IP>:5000` |
 | **TellegramService** | RabbitMQ → Telegram alerts (projects stack) | No host port; runs on `nas` network |
 | **AI Trading** | Portfolio editor + scheduled advisor (projects stack) | Tailscale `http://<TAILSCALE_IP>:5100` |
+| **Grafana + Loki** | Shared container logs (logging stack) | Tailscale `http://<TAILSCALE_IP>:3000` |
 
 **Operator guide (start here):** **[docs/HOWTO_USE_SCRIPTS.md](docs/HOWTO_USE_SCRIPTS.md)** — first-time setup, updates, update one service, AI Trading, recipes.
 
@@ -89,6 +90,8 @@ After changing `config.env` (ports, signup flag, paths, Tailscale IP), either `s
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Bot credentials for TellegramService |
 | `AI_TRADING_PORT` | Tailscale port for AI Trading dashboard (default `5100`) |
 | `GEMINI_API_KEY` | Optional; passed into the ai-trading container |
+| `GRAFANA_PORT` | Tailscale port for Grafana (default `3000`) |
+| `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` | Grafana login (change password from `changeme`) |
 
 `config.env` and generated `compose/.env` / `compose/projects/.env` are gitignored.
 
@@ -133,6 +136,26 @@ sudo ./scripts/07-setup-ai-trading.sh --deploy
 ```
 
 Dashboard: `http://<TAILSCALE_IP>:5100`. Ofelia: Mon–Fri 07:00 / 19:00 (`TZ`; prefer `Asia/Kolkata`).
+
+## Logging stack (Loki + Grafana + Alloy)
+
+Shared logs for **all** Docker containers on the NAS. Full guide: **[docs/LOGGING.md](docs/LOGGING.md)**.
+
+```bash
+# in config.env:
+#   GRAFANA_PORT=3000
+#   GRAFANA_ADMIN_USER=admin
+#   GRAFANA_ADMIN_PASSWORD='strong-password'
+
+sudo ./scripts/08-deploy-logging.sh
+```
+
+| Service | Tailscale URL |
+|---------|----------------|
+| Grafana | `http://<TAILSCALE_IP>:3000` |
+| Loki / Alloy | no host port (internal) |
+
+In Grafana → **Explore** → Loki → `{container="ai-trading"}`.
 
 Image pulls use **`${TAILSCALE_IP}:5000/...`** on the Docker host (not the compose DNS name `registry`). `05-deploy-projects.sh` adds that endpoint to `/etc/docker/daemon.json` `insecure-registries` automatically.
 
@@ -238,6 +261,9 @@ $NAS_ROOT/
     ai-trading/
       config.yaml
       data/{portfolio,stocks_cache,reports}/
+    loki/
+    grafana/
+    alloy/
   media/{movies,tv,music}/
 ```
 
