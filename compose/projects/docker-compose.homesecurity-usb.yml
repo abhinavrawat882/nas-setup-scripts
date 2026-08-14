@@ -1,0 +1,3 @@
+# Legacy static overlay — 05-deploy-projects.sh now generates
+# docker-compose.homesecurity-usb.generated.yml from /dev/video* on the host.
+# Kept so older docs still resolve. Not included by deploy anymore.

@@ -6,6 +6,10 @@
 #
 # RTSP URL format:  rtsp://<hostname-or-ip>:<port>/<path>
 # MediaMTX default: rtsp://<pi-hostname>:8554/cam
+#
+# USB webcam on the NAS (see HOMESECURITY_USB_CAMERA in config.env):
+#   - name: Arnos_Room
+#     source: /dev/video0
 
 cameras:
   - name: Hall_DoorFacing

@@ -2,6 +2,7 @@
 config.env
 compose/.env
 compose/projects/.env
+compose/projects/docker-compose.homesecurity-usb.generated.yml
 telegram.env.local
 
 # Editor / OS junk

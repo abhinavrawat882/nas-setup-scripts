@@ -38,6 +38,7 @@ Data under `/srv/nas/docker/…` and `/srv/nas/media/…` is **bind-mounted**. U
 Related docs:
 
 - [AI_TRADING_FIRST_TIME.md](AI_TRADING_FIRST_TIME.md)
+- [HOMESECURITY_FIRST_TIME.md](HOMESECURITY_FIRST_TIME.md)
 - [PUSH_IMAGES_FROM_MAC.md](PUSH_IMAGES_FROM_MAC.md)
 - [LOGGING.md](LOGGING.md) — Loki + Grafana setup and queries
 
@@ -117,13 +118,20 @@ Open: `http://arnosatlas:5100`
 
 ### Step E — HomeSecurity (optional)
 
-1. On Mac: `cd HomeSecuritySystem && ./scripts/build-push-nas.sh`
-2. In `config.env` set `HOMESECURITY_POSTGRES_PASSWORD` and `HOMESECURITY_RECORDINGS_PATH` (shared folder).
-3. On NAS:
+Copy-paste walkthrough: **[HOMESECURITY_FIRST_TIME.md](HOMESECURITY_FIRST_TIME.md)**.
 
 ```bash
+# NAS — paste the HomeSecurity block into config.env
+sudo nano config.env
+
+# Mac
+cd /Users/arno/Documents/Projects/HomeSecuritySystem
+export REGISTRY=arnosatlas:5000 REGISTRY_USER=nas REGISTRY_PASS='…'
+./scripts/build-push-nas.sh
+
+# NAS
 sudo ./scripts/09-setup-homesecurity.sh
-sudo nano /srv/nas/docker/homesecurity/cameras.yaml   # RTSP URLs
+sudo nano /srv/nas/docker/homesecurity/cameras.yaml
 sudo ./scripts/09-setup-homesecurity.sh --deploy
 ```
 

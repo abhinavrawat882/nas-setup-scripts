@@ -208,6 +208,7 @@ services:
       PERSON_TRACKING_ENABLED: ${HOMESECURITY_PERSON_TRACKING_ENABLED:-false}
       FACE_ANALYSIS_ENABLED: ${HOMESECURITY_FACE_ANALYSIS_ENABLED:-false}
       YOLO_DEVICE: ${HOMESECURITY_YOLO_DEVICE:-cpu}
+      OPENCV_FFMPEG_CAPTURE_OPTIONS: rtsp_transport;tcp|fflags;nobuffer|max_delay;500000
     volumes:
       - ${HOMESECURITY_RECORDINGS_PATH}:/data/recordings
       - ${NAS_ROOT}/docker/homesecurity/face_db:/data/face_db

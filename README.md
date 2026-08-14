@@ -16,7 +16,7 @@ Idempotent scripts to put Docker on **OpenMediaVault**, then deploy:
 
 **Operator guide (start here):** **[docs/HOWTO_USE_SCRIPTS.md](docs/HOWTO_USE_SCRIPTS.md)** — first-time setup, updates, update one service, AI Trading, recipes.
 
-Also: [AI Trading first-time](docs/AI_TRADING_FIRST_TIME.md) · [Push images from Mac](docs/PUSH_IMAGES_FROM_MAC.md) · [Logging (Loki/Grafana)](docs/LOGGING.md)
+Also: [AI Trading first-time](docs/AI_TRADING_FIRST_TIME.md) · [HomeSecurity first-time](docs/HOMESECURITY_FIRST_TIME.md) · [Push images from Mac](docs/PUSH_IMAGES_FROM_MAC.md) · [Logging (Loki/Grafana)](docs/LOGGING.md)
 
 Published ports (except Jellyfin and the HomeSecurity dashboard) bind to **Tailscale only** so Docker does not publish on `0.0.0.0` and bypass UFW onto the LAN. Tailscale encrypts traffic on your private tailnet; it is not anonymity.
 
@@ -96,6 +96,8 @@ After changing `config.env` (ports, signup flag, paths, Tailscale IP), either `s
 | `HOMESECURITY_POSTGRES_PASSWORD` | Postgres password for HomeSecurity (change from `changeme`) |
 | `HOMESECURITY_RECORDINGS_PATH` | Host path for MP4 clips (shared folder); default `${NAS_ROOT}/docker/homesecurity/recordings` |
 | `HOMESECURITY_DASHBOARD_LAN_URL` | Optional extra CORS origin, e.g. `http://192.168.1.10:8081` |
+| `HOMESECURITY_USB_CAMERA` | Host USB webcam path (e.g. `/dev/video0`); mapped into the pipeline as `/dev/video0` |
+| `HOMESECURITY_USB_CAMERA_GID` | Host `video` group id (Debian/OMV default `44`) |
 | `GRAFANA_PORT` | Tailscale port for Grafana (default `3000`) |
 | `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` | Grafana login (change password from `changeme`) |
 
@@ -147,19 +149,24 @@ Dashboard: `http://<TAILSCALE_IP>:5100`. Ofelia: Mon–Fri 07:00 / 19:00 (`TZ`; 
 
 ### HomeSecurity (cameras / lockdown)
 
+Full copy-paste guide: **[docs/HOMESECURITY_FIRST_TIME.md](docs/HOMESECURITY_FIRST_TIME.md)**.
+
 Dashboard is on the **LAN** (`:8081`) so household devices can trigger lockdown without Tailscale. The API is Tailscale-only (`:5101`); the UI proxies `/api` through nginx.
 
 ```bash
+# NAS — paste HomeSecurity keys into config.env (see first-time doc)
+sudo nano config.env
+
 # Mac — push linux/amd64 images
 cd "/Users/arno/Documents/Projects/HomeSecuritySystem" && ./scripts/build-push-nas.sh
 
-# NAS — set HOMESECURITY_POSTGRES_PASSWORD + HOMESECURITY_RECORDINGS_PATH in config.env
+# NAS
 sudo ./scripts/09-setup-homesecurity.sh
 sudo nano /srv/nas/docker/homesecurity/cameras.yaml
 sudo ./scripts/09-setup-homesecurity.sh --deploy
 ```
 
-LAN: `http://<nas-lan-ip>:8081`. Tailscale UI: `http://<TAILSCALE_IP>:8081`. Recordings live on `HOMESECURITY_RECORDINGS_PATH` (shared folder).
+LAN: `http://<nas-lan-ip>:8081`. Tailscale UI: `http://<TAILSCALE_IP>:8081`.
 
 ## Logging stack (Loki + Grafana + Alloy)
 

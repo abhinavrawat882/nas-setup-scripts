@@ -63,6 +63,22 @@ else
   cp "${EXAMPLE}" "${CAMERAS}"
 fi
 
+if [[ -n "${HOMESECURITY_USB_CAMERA:-}" ]] || [[ -c /dev/video0 || -c /dev/video1 ]]; then
+  if grep -qE 'name:[[:space:]]*Arnos_Room' "${CAMERAS}"; then
+    info "cameras.yaml already has Arnos_Room"
+  else
+    info "Adding Arnos_Room USB camera to ${CAMERAS}"
+    cat >>"${CAMERAS}" <<'YAML'
+
+  - name: Arnos_Room
+    source: /dev/video0
+YAML
+  fi
+  if [[ ! -e "${HOMESECURITY_USB_CAMERA}" ]]; then
+    warn "HOMESECURITY_USB_CAMERA=${HOMESECURITY_USB_CAMERA} is not plugged in / missing"
+  fi
+fi
+
 # Postgres alpine image runs as uid 70
 chown -R 70:70 "${HS_DIR}/postgres" || true
 
