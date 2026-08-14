@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Generate compose/projects/.env and bring the projects stack up
-# (RabbitMQ + Registry + TellegramService).
+# (RabbitMQ + Registry + TellegramService + AI Trading + HomeSecurity).
 # Requires the core stack network "nas". Idempotent.
 set -euo pipefail
 
@@ -24,6 +24,10 @@ fi
 
 if [[ -z "${TELEGRAM_BOT_TOKEN}" ]] || [[ -z "${TELEGRAM_CHAT_ID}" ]]; then
   warn "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID empty in config.env — tellegram will fail until set."
+fi
+
+if [[ "${HOMESECURITY_POSTGRES_PASSWORD}" == "changeme" ]]; then
+  warn "HOMESECURITY_POSTGRES_PASSWORD is still changeme. Set it in config.env."
 fi
 
 "${SCRIPT_DIR}/02-prepare-dirs.sh"
@@ -72,6 +76,24 @@ else
   warn "Then on NAS: sudo ./scripts/07-setup-ai-trading.sh --deploy"
 fi
 
+HS_API_IMAGE="${TAILSCALE_IP}:${REGISTRY_PORT}/homesecurity-api:latest"
+HS_CAMERAS="${NAS_ROOT}/docker/homesecurity/cameras.yaml"
+if [[ ! -f "${HS_CAMERAS}" ]]; then
+  warn "Missing ${HS_CAMERAS}"
+  warn "First-time: sudo ./scripts/09-setup-homesecurity.sh   # creates folders + seeds cameras.yaml"
+fi
+
+info "Pulling HomeSecurity images"
+if docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" pull api pipeline dashboard; then
+  info "Starting HomeSecurity (postgres, redis, api, pipeline, dashboard)"
+  docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" up -d \
+    postgres redis api pipeline dashboard
+else
+  warn "Could not pull HomeSecurity images (${HS_API_IMAGE} and siblings)"
+  warn "On your Mac (HomeSecuritySystem): ./scripts/build-push-nas.sh"
+  warn "Then on NAS: sudo ./scripts/09-setup-homesecurity.sh --deploy"
+fi
+
 info "Current containers"
 docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" ps
 
@@ -85,6 +107,11 @@ echo "  Tellegram image:     ${TELLEGRAM_IMAGE}"
 echo "  AI Trading:          http://${TAILSCALE_IP}:${AI_TRADING_PORT:-5100}"
 echo "  AI Trading image:    ${AI_TRADING_IMAGE}"
 echo "  Schedule:            Mon–Fri 07:00 and 19:00 (${TZ})"
+echo "  HomeSecurity UI:     LAN http://<nas-lan-ip>:${HOMESECURITY_DASHBOARD_PORT:-8081}"
+echo "  HomeSecurity UI:     Tailscale http://${TAILSCALE_IP}:${HOMESECURITY_DASHBOARD_PORT:-8081}"
+echo "  HomeSecurity API:    Tailscale http://${TAILSCALE_IP}:${HOMESECURITY_API_PORT:-5101}"
+echo "  Recordings path:     ${HOMESECURITY_RECORDINGS_PATH}"
 echo
 echo "  On the nas Docker network: rabbitmq:5672 , registry:5000 , tellegram , ai-trading"
+echo "  HomeSecurity uses isolated network 'homesecurity' (api, pipeline, postgres, redis)"
 echo "  Reclaim registry disk later: sudo ./scripts/06-registry-gc.sh"

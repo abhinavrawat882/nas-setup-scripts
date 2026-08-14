@@ -24,6 +24,7 @@ Install once: `brew install crane`.
 |---------|--------|
 | AI Trading | `AI Trading/scripts/build-push-nas.sh` (see also `AI Trading/docs/NAS_REGISTRY_PUSH.md`) |
 | TellegramService | `TellegramService/scripts/build-push-nas.sh` (if present) |
+| HomeSecurity | `HomeSecuritySystem/scripts/build-push-nas.sh` (`linux/amd64`; three images: api, pipeline, dashboard) |
 
 Generic one-liner pattern:
 
@@ -43,6 +44,7 @@ On the NAS, compose `image:` must use `${TAILSCALE_IP}:5000/...` (host pull), th
 
 ```bash
 sudo ./scripts/05-deploy-projects.sh
+# HomeSecurity first-time: sudo ./scripts/09-setup-homesecurity.sh --deploy
 ```
 
 Full AI Trading first-time + holiday deploy notes live in the AI Trading repo:

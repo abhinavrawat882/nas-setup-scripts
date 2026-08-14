@@ -11,13 +11,14 @@ Idempotent scripts to put Docker on **OpenMediaVault**, then deploy:
 | **Registry** | Private Docker registry (projects stack) | Tailscale `http://<TAILSCALE_IP>:5000` |
 | **TellegramService** | RabbitMQ → Telegram alerts (projects stack) | No host port; runs on `nas` network |
 | **AI Trading** | Portfolio editor + scheduled advisor (projects stack) | Tailscale `http://<TAILSCALE_IP>:5100` |
+| **HomeSecurity** | Cameras / lockdown dashboard (projects stack) | LAN `:8081`; API Tailscale `:5101` |
 | **Grafana + Loki** | Shared container logs (logging stack) | Tailscale `http://<TAILSCALE_IP>:3000` |
 
 **Operator guide (start here):** **[docs/HOWTO_USE_SCRIPTS.md](docs/HOWTO_USE_SCRIPTS.md)** — first-time setup, updates, update one service, AI Trading, recipes.
 
 Also: [AI Trading first-time](docs/AI_TRADING_FIRST_TIME.md) · [Push images from Mac](docs/PUSH_IMAGES_FROM_MAC.md) · [Logging (Loki/Grafana)](docs/LOGGING.md)
 
-Published ports (except Jellyfin) bind to **Tailscale only** so Docker does not publish on `0.0.0.0` and bypass UFW onto the LAN. Tailscale encrypts traffic on your private tailnet; it is not anonymity.
+Published ports (except Jellyfin and the HomeSecurity dashboard) bind to **Tailscale only** so Docker does not publish on `0.0.0.0` and bypass UFW onto the LAN. Tailscale encrypts traffic on your private tailnet; it is not anonymity.
 
 Do not expose Vaultwarden to the public internet without HTTPS.
 
@@ -90,6 +91,11 @@ After changing `config.env` (ports, signup flag, paths, Tailscale IP), either `s
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Bot credentials for TellegramService |
 | `AI_TRADING_PORT` | Tailscale port for AI Trading dashboard (default `5100`) |
 | `GEMINI_API_KEY` | Optional; passed into the ai-trading container |
+| `HOMESECURITY_API_PORT` | Tailscale port for HomeSecurity API (default `5101`) |
+| `HOMESECURITY_DASHBOARD_PORT` | LAN + Tailscale port for HomeSecurity UI (default `8081`) |
+| `HOMESECURITY_POSTGRES_PASSWORD` | Postgres password for HomeSecurity (change from `changeme`) |
+| `HOMESECURITY_RECORDINGS_PATH` | Host path for MP4 clips (shared folder); default `${NAS_ROOT}/docker/homesecurity/recordings` |
+| `HOMESECURITY_DASHBOARD_LAN_URL` | Optional extra CORS origin, e.g. `http://192.168.1.10:8081` |
 | `GRAFANA_PORT` | Tailscale port for Grafana (default `3000`) |
 | `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` | Grafana login (change password from `changeme`) |
 
@@ -105,7 +111,7 @@ After changing `config.env` (ports, signup flag, paths, Tailscale IP), either `s
    Put files in `movies/`, `tv/`, `music/` under your media path on the NAS.
 3. **Vaultwarden** — over Tailscale, open `http://<TAILSCALE_IP>:8080`, create your account. Then set `VAULTWARDEN_SIGNUPS_ALLOWED=false` and re-run deploy or `update.sh`. Point the Bitwarden app at `http://<TAILSCALE_IP>:8080`.
 
-## Projects stack (RabbitMQ + Registry + TellegramService + AI Trading)
+## Projects stack (RabbitMQ + Registry + TellegramService + AI Trading + HomeSecurity)
 
 ```bash
 sudo ./scripts/05-deploy-projects.sh
@@ -118,6 +124,8 @@ sudo ./scripts/05-deploy-projects.sh
 | Registry | http://`<TAILSCALE_IP>`:5000 | `registry:5000` (in-network only) |
 | TellegramService | (no host port) | container `tellegram` |
 | AI Trading Advisor | http://`<TAILSCALE_IP>`:5100 | container `ai-trading` |
+| HomeSecurity dashboard | LAN `:8081` (and Tailscale) | container `homesecurity-dashboard` |
+| HomeSecurity API | http://`<TAILSCALE_IP>`:5101 | container `homesecurity-api` (nginx `/api` from dashboard) |
 
 Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in `config.env` before deploy (or the worker will crash-loop).
 
@@ -136,6 +144,22 @@ sudo ./scripts/07-setup-ai-trading.sh --deploy
 ```
 
 Dashboard: `http://<TAILSCALE_IP>:5100`. Ofelia: Mon–Fri 07:00 / 19:00 (`TZ`; prefer `Asia/Kolkata`).
+
+### HomeSecurity (cameras / lockdown)
+
+Dashboard is on the **LAN** (`:8081`) so household devices can trigger lockdown without Tailscale. The API is Tailscale-only (`:5101`); the UI proxies `/api` through nginx.
+
+```bash
+# Mac — push linux/amd64 images
+cd "/Users/arno/Documents/Projects/HomeSecuritySystem" && ./scripts/build-push-nas.sh
+
+# NAS — set HOMESECURITY_POSTGRES_PASSWORD + HOMESECURITY_RECORDINGS_PATH in config.env
+sudo ./scripts/09-setup-homesecurity.sh
+sudo nano /srv/nas/docker/homesecurity/cameras.yaml
+sudo ./scripts/09-setup-homesecurity.sh --deploy
+```
+
+LAN: `http://<nas-lan-ip>:8081`. Tailscale UI: `http://<TAILSCALE_IP>:8081`. Recordings live on `HOMESECURITY_RECORDINGS_PATH` (shared folder).
 
 ## Logging stack (Loki + Grafana + Alloy)
 
@@ -261,6 +285,11 @@ $NAS_ROOT/
     ai-trading/
       config.yaml
       data/{portfolio,stocks_cache,reports}/
+    homesecurity/
+      postgres/
+      face_db/
+      cameras.yaml
+      recordings/          # default; override with HOMESECURITY_RECORDINGS_PATH
     loki/
     grafana/
     alloy/
@@ -293,7 +322,7 @@ cd compose/projects && sudo docker compose --env-file .env logs -f
 - App state lives in bind mounts under `NAS_ROOT/docker/...`. Updating or recreating containers does **not** wipe Portainer’s admin user, Jellyfin’s library setup, or Vaultwarden passwords.
 - **Jellyfin** libraries are mounted read-only at `/data/{movies,tv,music}` inside the container. Jellyfin ports stay on the LAN for local discovery (`8096`, `7359/udp`).
 - If you previously deployed Plex from an older revision, deploy/update removes the `plex` container automatically; your media files are untouched.
-- Other services bind to `TAILSCALE_IP` so they are not reachable on the LAN via Docker’s default `0.0.0.0` publish (which bypasses UFW).
+- Other services bind to `TAILSCALE_IP` so they are not reachable on the LAN via Docker’s default `0.0.0.0` publish (which bypasses UFW). **Jellyfin** and the **HomeSecurity dashboard** are the exceptions (LAN on purpose).
 - Scripts prefer **OMV-Extras** + `openmediavault-compose` on OpenMediaVault. On plain Debian/Ubuntu they fall back to Docker CE.
 - Ensure Tailscale is up on the NAS (`tailscale up`) before deploy so binds to `TAILSCALE_IP` succeed.
 

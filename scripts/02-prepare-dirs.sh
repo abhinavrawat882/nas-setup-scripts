@@ -20,6 +20,8 @@ dirs=(
   "${NAS_ROOT}/docker/ai-trading/data/portfolio"
   "${NAS_ROOT}/docker/ai-trading/data/stocks_cache"
   "${NAS_ROOT}/docker/ai-trading/data/reports"
+  "${NAS_ROOT}/docker/homesecurity/postgres"
+  "${NAS_ROOT}/docker/homesecurity/face_db"
   "${NAS_ROOT}/docker/loki"
   "${NAS_ROOT}/docker/alloy"
   "${NAS_ROOT}/docker/grafana"
@@ -39,6 +41,7 @@ chown -R "${PUID}:${PGID}" \
   "${NAS_ROOT}/docker/jellyfin" \
   "${NAS_ROOT}/docker/vaultwarden" \
   "${NAS_ROOT}/docker/ai-trading" \
+  "${NAS_ROOT}/docker/homesecurity/face_db" \
   "${MEDIA_PATH}"
 
 # Portainer / registry auth run as root inside containers; RabbitMQ image uses rabbitmq user (999).
@@ -49,6 +52,17 @@ chown -R root:root "${NAS_ROOT}/docker/registry-auth"
 chown -R 999:999 "${NAS_ROOT}/docker/rabbitmq"
 # Registry runs as root by default in registry:2
 chown -R root:root "${NAS_ROOT}/docker/registry"
+# Postgres alpine image runs as uid 70
+mkdir -p "${NAS_ROOT}/docker/homesecurity/postgres" "${HOMESECURITY_RECORDINGS_PATH}"
+chown -R 70:70 "${NAS_ROOT}/docker/homesecurity/postgres" || true
+chown "${PUID}:${PGID}" "${HOMESECURITY_RECORDINGS_PATH}" || true
+
+HS_CAMERAS="${NAS_ROOT}/docker/homesecurity/cameras.yaml"
+HS_CAMERAS_EXAMPLE="${REPO_ROOT}/compose/projects/homesecurity.cameras.example.yaml"
+if [[ ! -f "${HS_CAMERAS}" && -f "${HS_CAMERAS_EXAMPLE}" ]]; then
+  cp "${HS_CAMERAS_EXAMPLE}" "${HS_CAMERAS}"
+  echo "  + ${HS_CAMERAS} (from example — edit RTSP URLs)"
+fi
 
 # Loki / Grafana official image UIDs
 mkdir -p "${NAS_ROOT}/docker/loki" "${NAS_ROOT}/docker/grafana" "${NAS_ROOT}/docker/alloy"

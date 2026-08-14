@@ -1,0 +1,15 @@
+# cameras.yaml
+# Camera definitions for the HomeSecurity ingestion pipeline.
+#
+# Copied to ${NAS_ROOT}/docker/homesecurity/cameras.yaml on first setup.
+# Edit RTSP URLs so they are reachable from the NAS (Tailscale MagicDNS or LAN).
+#
+# RTSP URL format:  rtsp://<hostname-or-ip>:<port>/<path>
+# MediaMTX default: rtsp://<pi-hostname>:8554/cam
+
+cameras:
+  - name: Hall_DoorFacing
+    rtsp_url: rtsp://arnohomecam-hall:8554/cam
+
+  - name: Hall_KitchenFacing
+    rtsp_url: rtsp://arnohomecam-room:8554/cam

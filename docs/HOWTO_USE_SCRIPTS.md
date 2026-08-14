@@ -15,7 +15,7 @@ cd /path/to/nas-setup-scripts
 sudo ./…
 ```
 
-Data under `/srv/nas/docker/…` and `/srv/nas/media/…` is **bind-mounted**. Updating containers does **not** wipe Portainer, Vaultwarden, Jellyfin libraries, RabbitMQ, or AI Trading config/data.
+Data under `/srv/nas/docker/…` and `/srv/nas/media/…` is **bind-mounted**. Updating containers does **not** wipe Portainer, Vaultwarden, Jellyfin libraries, RabbitMQ, AI Trading config/data, or HomeSecurity postgres/recordings.
 
 ---
 
@@ -28,8 +28,9 @@ Data under `/srv/nas/docker/…` and `/srv/nas/media/…` is **bind-mounted**. U
 | `scripts/02-prepare-dirs.sh` | Re-create folder layout under `NAS_ROOT` |
 | `scripts/03-deploy-stack.sh` | Apply `config.env` + (re)start **core**: Portainer, Jellyfin, Vaultwarden |
 | `./update.sh` [name] | Day-to-day **core** image updates (`jellyfin`, `portainer`, `vaultwarden`) |
-| `scripts/05-deploy-projects.sh` | (Re)start **projects**: RabbitMQ, Registry, Tellegram, AI Trading |
+| `scripts/05-deploy-projects.sh` | (Re)start **projects**: RabbitMQ, Registry, Tellegram, AI Trading, HomeSecurity |
 | `scripts/07-setup-ai-trading.sh` | First-time AI Trading dirs + seed config (+ optional `--deploy`) |
+| `scripts/09-setup-homesecurity.sh` | First-time HomeSecurity dirs + cameras.yaml (+ optional `--deploy`) |
 | `scripts/08-deploy-logging.sh` | Deploy **Loki + Grafana + Alloy** (shared container logs) |
 | `scripts/06-registry-gc.sh` | Free registry disk (optional `--prune`) |
 | `scripts/uninstall-stack.sh` | Stop/remove containers; **keeps** data on disk |
@@ -114,7 +115,21 @@ sudo ./scripts/07-setup-ai-trading.sh --deploy
 
 Open: `http://arnosatlas:5100`
 
-### Step E — logging stack (recommended)
+### Step E — HomeSecurity (optional)
+
+1. On Mac: `cd HomeSecuritySystem && ./scripts/build-push-nas.sh`
+2. In `config.env` set `HOMESECURITY_POSTGRES_PASSWORD` and `HOMESECURITY_RECORDINGS_PATH` (shared folder).
+3. On NAS:
+
+```bash
+sudo ./scripts/09-setup-homesecurity.sh
+sudo nano /srv/nas/docker/homesecurity/cameras.yaml   # RTSP URLs
+sudo ./scripts/09-setup-homesecurity.sh --deploy
+```
+
+Dashboard on LAN: `http://<nas-lan-ip>:8081` (no Tailscale). API is Tailscale-only (`:5101`).
+
+### Step F — logging stack (recommended)
 
 Shared logs for every container (AI Trading, Tellegram, RabbitMQ, …):
 
@@ -153,7 +168,7 @@ sudo ./update.sh          # all three
 sudo ./update.sh --prune  # also delete unused old images
 ```
 
-### Projects stack (RabbitMQ, Registry, Tellegram, AI Trading)
+### Projects stack (RabbitMQ, Registry, Tellegram, AI Trading, HomeSecurity)
 
 ```bash
 sudo ./scripts/05-deploy-projects.sh
@@ -206,7 +221,7 @@ sudo docker compose --env-file .env up -d registry
 | Changed | Apply with |
 |---------|------------|
 | Core ports / Tailscale / Vaultwarden signups / PUID | `sudo ./update.sh` or `sudo ./scripts/03-deploy-stack.sh` |
-| RabbitMQ / Registry / Telegram / AI Trading env | `sudo ./scripts/05-deploy-projects.sh` |
+| RabbitMQ / Registry / Telegram / AI Trading / HomeSecurity env | `sudo ./scripts/05-deploy-projects.sh` |
 | `TZ` (schedules) | projects deploy + recreate `ai-trading-ofelia` |
 
 ### After you change only AI Trading **config.yaml**
@@ -233,6 +248,19 @@ cd compose/projects && sudo docker compose --env-file .env pull ai-trading \
   && sudo docker compose --env-file .env up -d ai-trading ai-trading-ofelia
 ```
 
+### After you change HomeSecurity **code** (Mac)
+
+```bash
+# Mac
+./scripts/build-push-nas.sh
+
+# NAS
+sudo ./scripts/05-deploy-projects.sh
+# or only:
+cd compose/projects && sudo docker compose --env-file .env pull api pipeline dashboard \
+  && sudo docker compose --env-file .env up -d postgres redis api pipeline dashboard
+```
+
 ### After you change TellegramService **code** (Mac)
 
 ```bash
@@ -256,9 +284,11 @@ sudo docker compose --env-file .env up -d tellegram
 | Turn off Vaultwarden signups | Set `VAULTWARDEN_SIGNUPS_ALLOWED=false` in `config.env` → `sudo ./update.sh vaultwarden` |
 | Free registry disk | `sudo ./scripts/06-registry-gc.sh --prune` |
 | Deploy shared logging (Loki/Grafana) | `sudo ./scripts/08-deploy-logging.sh` — see [LOGGING.md](LOGGING.md) |
-| See AI Trading logs in Grafana | Explore → `{container="ai-trading"}` |
+| Re-seed HomeSecurity folders/cameras.yaml | `sudo ./scripts/09-setup-homesecurity.sh` |
+| Overwrite cameras.yaml from template | `sudo ./scripts/09-setup-homesecurity.sh --force` then `sudo nano …` |
+| See HomeSecurity logs in Grafana | Explore → `{container="homesecurity-api"}` |
 | See what’s running | `docker ps` or Portainer |
-| Logs | `docker logs -f ai-trading` / `tellegram` / `rabbitmq` |
+| Logs | `docker logs -f ai-trading` / `tellegram` / `homesecurity-api` / `homesecurity-pipeline` / `rabbitmq` |
 | Stop everything, keep data | `sudo ./scripts/uninstall-stack.sh` |
 | Start again after uninstall | `sudo ./scripts/03-deploy-stack.sh` then `sudo ./scripts/05-deploy-projects.sh` |
 
@@ -273,6 +303,9 @@ sudo docker compose --env-file .env up -d tellegram
 | RabbitMQ management | http://arnosatlas:15672 |
 | Registry | http://arnosatlas:5000 |
 | AI Trading | http://arnosatlas:5100 |
+| HomeSecurity dashboard (LAN) | http://\<lan-ip\>:8081 |
+| HomeSecurity dashboard (Tailscale) | http://arnosatlas:8081 |
+| HomeSecurity API (Tailscale) | http://arnosatlas:5101 |
 | Grafana (logs) | http://arnosatlas:3000 |
 | Jellyfin | http://\<lan-ip\>:8096 |
 
@@ -288,5 +321,5 @@ Mac build  ──►  crane push  ──►  registry:5000/…  ──►  NAS d
 ```
 
 - **`setup.sh` / `update.sh` / `03`** → core (Hub images).
-- **`05` / `07`** → projects (local registry images + RabbitMQ).
+- **`05` / `07` / `09`** → projects (local registry images + RabbitMQ + HomeSecurity).
 - **Never delete `/srv/nas/docker/…`** unless you intend to wipe that app’s state.

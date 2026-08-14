@@ -1,6 +1,8 @@
 # NAS projects stack: RabbitMQ + local Docker Registry + TellegramService
+# + AI Trading + HomeSecurity.
 # Shares the external "nas" network created by the core stack.
-# Host ports bind to TAILSCALE_IP only (not LAN / 0.0.0.0).
+# Host ports bind to TAILSCALE_IP only (not LAN / 0.0.0.0), except:
+#   - HomeSecurity dashboard (LAN, so household can trigger lockdown without Tailscale)
 
 services:
   rabbitmq:
@@ -116,7 +118,120 @@ services:
     networks:
       - nas
 
+  # HomeSecurity — images pushed from Mac (HomeSecuritySystem/scripts/build-push-nas.sh).
+  # Dashboard is on LAN (like Jellyfin). API is Tailscale-only; LAN UI uses nginx /api proxy.
+  postgres:
+    image: postgres:16-alpine
+    container_name: homesecurity-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${HOMESECURITY_POSTGRES_DB:-homesecurity}
+      POSTGRES_USER: ${HOMESECURITY_POSTGRES_USER:-homesecurity}
+      POSTGRES_PASSWORD: ${HOMESECURITY_POSTGRES_PASSWORD:?set HOMESECURITY_POSTGRES_PASSWORD in config.env}
+      TZ: ${TZ:-UTC}
+    volumes:
+      - ${NAS_ROOT}/docker/homesecurity/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${HOMESECURITY_POSTGRES_USER:-homesecurity} -d ${HOMESECURITY_POSTGRES_DB:-homesecurity}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - homesecurity
+
+  redis:
+    image: redis:7-alpine
+    container_name: homesecurity-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - homesecurity
+
+  api:
+    image: ${TAILSCALE_IP}:${REGISTRY_PORT:-5000}/homesecurity-api:latest
+    platform: linux/amd64
+    container_name: homesecurity-api
+    restart: unless-stopped
+    user: "${PUID}:${PGID}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      TZ: ${TZ:-UTC}
+      ConnectionStrings__DefaultConnection: >-
+        Host=postgres;Port=5432;Database=${HOMESECURITY_POSTGRES_DB:-homesecurity};Username=${HOMESECURITY_POSTGRES_USER:-homesecurity};Password=${HOMESECURITY_POSTGRES_PASSWORD}
+      ConnectionStrings__Redis: redis:6379
+      Redis__Channel: security.events.completed
+      Media__BasePath: /data/recordings
+      Telegram__Enabled: ${HOMESECURITY_TELEGRAM_ENABLED:-true}
+      Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
+      Telegram__ChatId: ${TELEGRAM_CHAT_ID:-}
+      PublicUrls__ApiBaseUrl: http://${TAILSCALE_IP}:${HOMESECURITY_API_PORT:-5101}
+      PublicUrls__DashboardBaseUrl: http://${TAILSCALE_IP}:${HOMESECURITY_DASHBOARD_PORT:-8081}
+      Retention__Enabled: ${HOMESECURITY_RETENTION_ENABLED:-true}
+      Retention__Days: ${HOMESECURITY_RETENTION_DAYS:-10}
+      Retention__IntervalHours: ${HOMESECURITY_RETENTION_INTERVAL_HOURS:-6}
+      Cors__Origins__0: http://${TAILSCALE_IP}:${HOMESECURITY_DASHBOARD_PORT:-8081}
+      Cors__Origins__1: ${HOMESECURITY_DASHBOARD_LAN_URL:-http://127.0.0.1:8081}
+    volumes:
+      - ${HOMESECURITY_RECORDINGS_PATH}:/data/recordings
+    ports:
+      - "${TAILSCALE_IP}:${HOMESECURITY_API_PORT:-5101}:8080"
+    networks:
+      - homesecurity
+
+  pipeline:
+    image: ${TAILSCALE_IP}:${REGISTRY_PORT:-5000}/homesecurity-pipeline:latest
+    platform: linux/amd64
+    container_name: homesecurity-pipeline
+    restart: unless-stopped
+    user: "${PUID}:${PGID}"
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-UTC}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_CHANNEL: security.events.completed
+      RECORDINGS_DIR: /data/recordings
+      FACE_DB_DIR: /data/face_db
+      OBJECT_DETECTION_ENABLED: ${HOMESECURITY_OBJECT_DETECTION_ENABLED:-false}
+      PERSON_TRACKING_ENABLED: ${HOMESECURITY_PERSON_TRACKING_ENABLED:-false}
+      FACE_ANALYSIS_ENABLED: ${HOMESECURITY_FACE_ANALYSIS_ENABLED:-false}
+      YOLO_DEVICE: ${HOMESECURITY_YOLO_DEVICE:-cpu}
+    volumes:
+      - ${HOMESECURITY_RECORDINGS_PATH}:/data/recordings
+      - ${NAS_ROOT}/docker/homesecurity/face_db:/data/face_db
+      - ${NAS_ROOT}/docker/homesecurity/cameras.yaml:/app/cameras.yaml:ro
+    networks:
+      - homesecurity
+
+  dashboard:
+    image: ${TAILSCALE_IP}:${REGISTRY_PORT:-5000}/homesecurity-dashboard:latest
+    platform: linux/amd64
+    container_name: homesecurity-dashboard
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      # LAN + Tailscale (UFW bypass) so household can open the UI without Tailscale.
+      - "${HOMESECURITY_DASHBOARD_PORT:-8081}:80"
+    networks:
+      - homesecurity
+
 networks:
   nas:
     external: true
     name: nas
+  homesecurity:
+    name: homesecurity
+    driver: bridge
