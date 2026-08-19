@@ -24,6 +24,7 @@ Data under `/srv/nas/docker/…` and `/srv/nas/media/…` is **bind-mounted**. U
 | Script | When to use |
 |--------|-------------|
 | `./setup.sh` | **First time only** — install Docker + dirs + core stack |
+| `./start-all.sh` | **After a reboot** (or uninstall) — bring core + projects + logging back up |
 | `scripts/01-install-docker.sh` | Docker missing / broken (rarely alone) |
 | `scripts/02-prepare-dirs.sh` | Re-create folder layout under `NAS_ROOT` |
 | `scripts/03-deploy-stack.sh` | Apply `config.env` + (re)start **core**: Portainer, Jellyfin, Vaultwarden |
@@ -153,21 +154,42 @@ Details: [LOGGING.md](LOGGING.md)
 
 ---
 
-## 2) Pull latest scripts from git (before updating)
+## 2) After a reboot (nothing is up)
+
+Containers use `restart: unless-stopped`, so they usually come back when Docker starts. If the box rebooted and **nothing is working** (Docker late, Tailscale down, disks not mounted yet), bring every stack back with one command:
+
+```bash
+cd /path/to/nas-setup-scripts
+sudo ./start-all.sh
+```
+
+That runs, in order: `03-deploy-stack.sh` → `05-deploy-projects.sh` → `08-deploy-logging.sh`. Bind-mounted data under `/srv/nas` is kept. **Do not** re-run `./setup.sh`.
+
+If it still looks dead:
+
+```bash
+sudo systemctl status docker
+tailscale status
+docker ps
+```
+
+---
+
+## 3) Pull latest scripts from git (before updating)
 
 When you change the repo on your Mac and push to GitHub:
 
 ```bash
 cd /path/to/nas-setup-scripts
 git pull
-chmod +x setup.sh scripts/*.sh update.sh
+chmod +x setup.sh start-all.sh scripts/*.sh update.sh
 ```
 
 Then run the update/deploy command you need below.
 
 ---
 
-## 3) Update everything (day-to-day)
+## 4) Update everything (day-to-day)
 
 ### Core apps (Portainer, Jellyfin, Vaultwarden)
 
@@ -194,7 +216,7 @@ This rewrites `compose/projects/.env` from `config.env`, pulls images it can, an
 
 ---
 
-## 4) Update one specific thing
+## 5) Update one specific thing
 
 ### Core — one app
 
@@ -283,7 +305,7 @@ sudo docker compose --env-file .env up -d tellegram
 
 ---
 
-## 5) Common “I want to…” recipes
+## 6) Common “I want to…” recipes
 
 | Goal | Commands |
 |------|----------|
@@ -298,11 +320,11 @@ sudo docker compose --env-file .env up -d tellegram
 | See what’s running | `docker ps` or Portainer |
 | Logs | `docker logs -f ai-trading` / `tellegram` / `homesecurity-api` / `homesecurity-pipeline` / `rabbitmq` |
 | Stop everything, keep data | `sudo ./scripts/uninstall-stack.sh` |
-| Start again after uninstall | `sudo ./scripts/03-deploy-stack.sh` then `sudo ./scripts/05-deploy-projects.sh` |
+| Start again after uninstall / reboot | `sudo ./start-all.sh` |
 
 ---
 
-## 6) URLs (your NAS)
+## 7) URLs (your NAS)
 
 | Service | URL |
 |---------|-----|
@@ -319,7 +341,7 @@ sudo docker compose --env-file .env up -d tellegram
 
 ---
 
-## 7) Mental model
+## 8) Mental model
 
 ```text
 config.env  ──►  compose/.env           ──►  core containers
@@ -329,5 +351,6 @@ Mac build  ──►  crane push  ──►  registry:5000/…  ──►  NAS d
 ```
 
 - **`setup.sh` / `update.sh` / `03`** → core (Hub images).
+- **`start-all.sh`** → core + projects + logging after reboot / uninstall.
 - **`05` / `07` / `09`** → projects (local registry images + RabbitMQ + HomeSecurity).
 - **Never delete `/srv/nas/docker/…`** unless you intend to wipe that app’s state.

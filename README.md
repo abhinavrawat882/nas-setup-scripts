@@ -33,7 +33,7 @@ cd nas-setup-scripts
 cp config.env.example config.env
 nano config.env   # set NAS_ROOT, PUID, PGID, TZ, TAILSCALE_IP, passwords
 
-chmod +x setup.sh scripts/*.sh update.sh
+chmod +x setup.sh start-all.sh scripts/*.sh update.sh
 sudo ./setup.sh
 ```
 
@@ -44,6 +44,12 @@ That runs, in order (first time only):
 3. `scripts/03-deploy-stack.sh` — core stack `docker compose up -d`
 
 **You do not need to run `./setup.sh` again** to update apps. Setup is idempotent and keeps bind-mounted data, but day-to-day updates should use `./update.sh` so Docker install / Portainer wizard are not part of the flow.
+
+After a reboot (or after `uninstall-stack.sh`), bring core + projects + logging back up with:
+
+```bash
+sudo ./start-all.sh
+```
 
 Optional projects stack (RabbitMQ + Registry + TellegramService), after core is up:
 
@@ -306,6 +312,9 @@ $NAS_ROOT/
 ## Useful commands
 
 ```bash
+# After reboot / bring everything up again (core + projects + logging)
+sudo ./start-all.sh
+
 # Update images (preferred after first setup)
 sudo ./update.sh
 
@@ -339,4 +348,4 @@ cd compose/projects && sudo docker compose --env-file .env logs -f
 sudo ./scripts/uninstall-stack.sh
 ```
 
-Stops projects (if present) then core. Everything under `NAS_ROOT` stays so you can redeploy later.
+Stops projects (if present) then core. Everything under `NAS_ROOT` stays so you can redeploy later with `sudo ./start-all.sh`.
