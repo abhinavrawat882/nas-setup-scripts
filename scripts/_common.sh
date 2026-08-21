@@ -113,6 +113,30 @@ require_nas_network() {
   fi
 }
 
+# Core update/deploy never starts the projects stack. If those containers exist
+# but are exited (e.g. after a Docker restart), remind the operator.
+warn_if_projects_stack_down() {
+  local names=(rabbitmq registry tellegram ai-trading homesecurity-api homesecurity-dashboard)
+  local stopped=()
+  local name state
+  for name in "${names[@]}"; do
+    if ! docker inspect "${name}" >/dev/null 2>&1; then
+      continue
+    fi
+    state="$(docker inspect -f '{{.State.Status}}' "${name}" 2>/dev/null || true)"
+    if [[ "${state}" != "running" ]]; then
+      stopped+=("${name}")
+    fi
+  done
+  if [[ ${#stopped[@]} -eq 0 ]]; then
+    return 0
+  fi
+  warn "Projects stack containers are not running: ${stopped[*]}"
+  warn "Core deploy/update does not start them. Bring projects back with:"
+  warn "  sudo ./scripts/05-deploy-projects.sh"
+  warn "Or everything: sudo ./start-all.sh"
+}
+
 write_compose_env() {
   local out="${REPO_ROOT}/compose/.env"
   cat >"${out}" <<EOF
@@ -262,4 +286,7 @@ PY
   if ! docker_ready; then
     die "Docker did not come back after restarting for insecure-registries"
   fi
+  warn "Docker was restarted — all containers were stopped."
+  warn "Core will need: sudo ./scripts/03-deploy-stack.sh  (or sudo ./start-all.sh)"
+  warn "Projects deploy continues next; re-run start-all.sh if core is still down afterward."
 }

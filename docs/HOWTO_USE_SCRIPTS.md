@@ -28,7 +28,7 @@ Data under `/srv/nas/docker/…`, `/srv/nas/projects/`, and `/srv/nas/media/…`
 | `scripts/01-install-docker.sh` | Docker missing / broken (rarely alone) |
 | `scripts/02-prepare-dirs.sh` | Re-create folder layout under `NAS_ROOT` |
 | `scripts/03-deploy-stack.sh` | Apply `config.env` + (re)start **core**: Portainer, Jellyfin, Vaultwarden, code-server |
-| `./update.sh` [name] | Day-to-day **core** image updates (`jellyfin`, `portainer`, `vaultwarden`, `code-server`) |
+| `./update.sh` [name] | Day-to-day **core** image updates (`jellyfin`, `portainer`, `vaultwarden`, `code-server`) — does **not** start projects |
 | `scripts/05-deploy-projects.sh` | (Re)start **projects**: RabbitMQ, Registry, Tellegram, AI Trading, HomeSecurity |
 | `scripts/07-setup-ai-trading.sh` | First-time AI Trading dirs + seed config (+ optional `--deploy`) |
 | `scripts/09-setup-homesecurity.sh` | First-time HomeSecurity dirs + cameras.yaml (+ optional `--deploy`) |
@@ -325,6 +325,7 @@ sudo docker compose --env-file .env up -d tellegram
 | Logs | `docker logs -f ai-trading` / `tellegram` / `homesecurity-api` / `homesecurity-pipeline` / `rabbitmq` |
 | Stop everything, keep data | `sudo ./scripts/uninstall-stack.sh` |
 | Start again after uninstall / reboot | `sudo ./start-all.sh` |
+| Projects down after a core-only update | `sudo ./scripts/05-deploy-projects.sh` (data under `/srv/nas/docker/…` is kept) |
 
 ---
 

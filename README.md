@@ -80,7 +80,7 @@ sudo ./update.sh code-server
 sudo ./update.sh --prune
 ```
 
-After changing `config.env` (ports, signup flag, paths, Tailscale IP), either `sudo ./update.sh` or `sudo ./scripts/03-deploy-stack.sh` applies it. For the projects stack, use `sudo ./scripts/05-deploy-projects.sh`.
+After changing `config.env` (ports, signup flag, paths, Tailscale IP), either `sudo ./update.sh` or `sudo ./scripts/03-deploy-stack.sh` applies it. **Those commands update the core stack only** (Portainer / Jellyfin / Vaultwarden / code-server). For the projects stack, use `sudo ./scripts/05-deploy-projects.sh`. After a reboot (or if projects look stopped), use `sudo ./start-all.sh`.
 
 ## Configure `config.env`
 

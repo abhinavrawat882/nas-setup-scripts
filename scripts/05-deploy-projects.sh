@@ -33,6 +33,11 @@ fi
 "${SCRIPT_DIR}/02-prepare-dirs.sh"
 ensure_registry_htpasswd
 ensure_insecure_registry
+# insecure-registries may restart Docker and stop every container; bring core back first.
+if ! docker inspect -f '{{.State.Running}}' portainer 2>/dev/null | grep -qx true; then
+  warn "Core containers are not running (often after a Docker restart). Redeploying core first."
+  "${SCRIPT_DIR}/03-deploy-stack.sh"
+fi
 write_projects_compose_env
 
 COMPOSE_FILE="${REPO_ROOT}/compose/projects/docker-compose.yml"
