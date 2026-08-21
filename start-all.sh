@@ -26,7 +26,7 @@ if ! docker_ready; then
   die "Docker is not ready. Run scripts/01-install-docker.sh first, then retry: sudo ./start-all.sh"
 fi
 
-info "Bringing up core stack (Portainer, Jellyfin, Vaultwarden)"
+info "Bringing up core stack (Portainer, Jellyfin, Vaultwarden, code-server)"
 "${SCRIPT_DIR}/03-deploy-stack.sh"
 
 info "Bringing up projects stack (RabbitMQ, Registry, Tellegram, AI Trading, HomeSecurity)"
@@ -39,6 +39,7 @@ echo
 info "All stacks are up (data under ${NAS_ROOT} preserved)."
 echo "  Portainer:     http://${TAILSCALE_IP}:${PORTAINER_PORT}"
 echo "  Vaultwarden:   http://${TAILSCALE_IP}:${VAULTWARDEN_PORT}"
+echo "  code-server:   http://${TAILSCALE_IP}:${CODE_SERVER_PORT}"
 echo "  Jellyfin (LAN): http://<lan-ip>:${JELLYFIN_PORT}"
 echo "  RabbitMQ mgmt: http://${TAILSCALE_IP}:${RABBITMQ_MGMT_PORT}"
 echo "  Registry:      http://${TAILSCALE_IP}:${REGISTRY_PORT}"

@@ -14,6 +14,8 @@ dirs=(
   "${NAS_ROOT}/docker/portainer"
   "${NAS_ROOT}/docker/jellyfin/config"
   "${NAS_ROOT}/docker/vaultwarden"
+  "${NAS_ROOT}/docker/code-server"
+  "${NAS_ROOT}/projects"
   "${NAS_ROOT}/docker/rabbitmq"
   "${NAS_ROOT}/docker/registry"
   "${NAS_ROOT}/docker/registry-auth"
@@ -40,6 +42,8 @@ info "Setting ownership to ${PUID}:${PGID}"
 chown -R "${PUID}:${PGID}" \
   "${NAS_ROOT}/docker/jellyfin" \
   "${NAS_ROOT}/docker/vaultwarden" \
+  "${NAS_ROOT}/docker/code-server" \
+  "${NAS_ROOT}/projects" \
   "${NAS_ROOT}/docker/ai-trading" \
   "${NAS_ROOT}/docker/homesecurity/face_db" \
   "${MEDIA_PATH}"

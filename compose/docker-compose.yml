@@ -1,4 +1,4 @@
-# NAS core stack: Portainer + Jellyfin + Vaultwarden
+# NAS core stack: Portainer + Jellyfin + Vaultwarden + code-server
 # Driven by compose/.env (generated from repo-root config.env by deploy script).
 # Project name comes from COMPOSE_PROJECT_NAME in .env.
 
@@ -51,6 +51,25 @@ services:
       - ${NAS_ROOT}/docker/vaultwarden:/data
     ports:
       - "${TAILSCALE_IP}:${VAULTWARDEN_PORT:-8080}:80"
+    networks:
+      - nas
+
+  # Browser VS Code (Tailscale only). Workspace: ${NAS_ROOT}/projects → /projects
+  code-server:
+    image: lscr.io/linuxserver/code-server:latest
+    container_name: code-server
+    restart: unless-stopped
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-100}
+      - TZ=${TZ:-UTC}
+      - PASSWORD=${CODE_SERVER_PASSWORD:?set CODE_SERVER_PASSWORD in config.env}
+      - DEFAULT_WORKSPACE=/projects
+    volumes:
+      - ${NAS_ROOT}/docker/code-server:/config
+      - ${NAS_ROOT}/projects:/projects
+    ports:
+      - "${TAILSCALE_IP}:${CODE_SERVER_PORT:-8443}:8443"
     networks:
       - nas
 

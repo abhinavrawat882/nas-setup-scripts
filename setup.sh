@@ -17,7 +17,7 @@ fi
 
 # If the stack is already running, prefer update.sh so it is obvious we are
 # not doing a destructive reinstall.
-if docker_ready && docker ps --format '{{.Names}}' 2>/dev/null | grep -Eq '^(portainer|jellyfin|vaultwarden)$'; then
+if docker_ready && docker ps --format '{{.Names}}' 2>/dev/null | grep -Eq '^(portainer|jellyfin|vaultwarden|code-server)$'; then
   warn "Stack containers already look deployed."
   warn "For image updates (keeps Portainer login, Jellyfin, Vaultwarden data), run:"
   warn "  sudo ./update.sh"

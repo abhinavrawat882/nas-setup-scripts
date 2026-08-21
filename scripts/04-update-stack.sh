@@ -32,8 +32,9 @@ for arg in "$@"; do
       cat <<'EOF'
 Update NAS stack containers (images only). App data under NAS_ROOT is kept.
 
-  sudo ./scripts/04-update-stack.sh              Update Portainer, Jellyfin, Vaultwarden
+  sudo ./scripts/04-update-stack.sh              Update Portainer, Jellyfin, Vaultwarden, code-server
   sudo ./scripts/04-update-stack.sh jellyfin     Update only Jellyfin
+  sudo ./scripts/04-update-stack.sh code-server  Update only code-server
   sudo ./scripts/04-update-stack.sh --prune      Update all, then remove unused images
 EOF
       exit 0
@@ -62,19 +63,20 @@ info "Updating images (data under ${NAS_ROOT} is NOT deleted)"
 if [[ ${#SERVICES[@]} -eq 0 ]]; then
   docker compose -f "${COMPOSE_FILE}" --env-file .env pull
   info "Recreating containers with new images"
-  docker compose -f "${COMPOSE_FILE}" --env-file .env up -d --remove-orphans
+  docker compose -f "${COMPOSE_FILE}" --env-file .env up -d
 else
   for svc in "${SERVICES[@]}"; do
     case "${svc}" in
-      portainer|jellyfin|vaultwarden) ;;
+      portainer|jellyfin|vaultwarden|code-server) ;;
       *)
-        die "Unknown service '${svc}'. Use: portainer, jellyfin, or vaultwarden"
+        die "Unknown service '${svc}'. Use: portainer, jellyfin, vaultwarden, or code-server"
         ;;
     esac
   done
   docker compose -f "${COMPOSE_FILE}" --env-file .env pull "${SERVICES[@]}"
   info "Recreating: ${SERVICES[*]}"
-  docker compose -f "${COMPOSE_FILE}" --env-file .env up -d --no-deps --remove-orphans "${SERVICES[@]}"
+  # Never pass --remove-orphans with a service filter — that can stop sibling core services.
+  docker compose -f "${COMPOSE_FILE}" --env-file .env up -d --no-deps "${SERVICES[@]}"
 fi
 
 info "Current containers"
@@ -86,7 +88,10 @@ if [[ "${PRUNE}" == "true" ]]; then
 fi
 
 echo
-info "Update finished. Portainer / Jellyfin / Vaultwarden settings and data were kept."
+info "Update finished. Core app data under ${NAS_ROOT} was kept."
 echo "  Portainer:      http://${TAILSCALE_IP}:${PORTAINER_PORT}"
 echo "  Vaultwarden:    http://${TAILSCALE_IP}:${VAULTWARDEN_PORT}"
+echo "  code-server:    http://${TAILSCALE_IP}:${CODE_SERVER_PORT}"
 echo "  Jellyfin (LAN): http://<lan-ip>:${JELLYFIN_PORT}"
+info "This updates core only. Projects (RabbitMQ / AI Trading / HomeSecurity): sudo ./scripts/05-deploy-projects.sh"
+warn_if_projects_stack_down

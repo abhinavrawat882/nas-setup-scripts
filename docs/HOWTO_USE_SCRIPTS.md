@@ -15,7 +15,7 @@ cd /path/to/nas-setup-scripts
 sudo ./…
 ```
 
-Data under `/srv/nas/docker/…` and `/srv/nas/media/…` is **bind-mounted**. Updating containers does **not** wipe Portainer, Vaultwarden, Jellyfin libraries, RabbitMQ, AI Trading config/data, or HomeSecurity postgres/recordings.
+Data under `/srv/nas/docker/…`, `/srv/nas/projects/`, and `/srv/nas/media/…` is **bind-mounted**. Updating containers does **not** wipe Portainer, Vaultwarden, Jellyfin libraries, code-server settings, RabbitMQ, AI Trading config/data, or HomeSecurity postgres/recordings.
 
 ---
 
@@ -27,8 +27,8 @@ Data under `/srv/nas/docker/…` and `/srv/nas/media/…` is **bind-mounted**. U
 | `./start-all.sh` | **After a reboot** (or uninstall) — bring core + projects + logging back up |
 | `scripts/01-install-docker.sh` | Docker missing / broken (rarely alone) |
 | `scripts/02-prepare-dirs.sh` | Re-create folder layout under `NAS_ROOT` |
-| `scripts/03-deploy-stack.sh` | Apply `config.env` + (re)start **core**: Portainer, Jellyfin, Vaultwarden |
-| `./update.sh` [name] | Day-to-day **core** image updates (`jellyfin`, `portainer`, `vaultwarden`) |
+| `scripts/03-deploy-stack.sh` | Apply `config.env` + (re)start **core**: Portainer, Jellyfin, Vaultwarden, code-server |
+| `./update.sh` [name] | Day-to-day **core** image updates (`jellyfin`, `portainer`, `vaultwarden`, `code-server`) — does **not** start projects |
 | `scripts/05-deploy-projects.sh` | (Re)start **projects**: RabbitMQ, Registry, Tellegram, AI Trading, HomeSecurity |
 | `scripts/07-setup-ai-trading.sh` | First-time AI Trading dirs + seed config (+ optional `--deploy`) |
 | `scripts/09-setup-homesecurity.sh` | First-time HomeSecurity dirs + cameras.yaml (+ optional `--deploy`) |
@@ -70,6 +70,7 @@ RABBITMQ_USER=…
 RABBITMQ_PASS=…
 REGISTRY_USER=…
 REGISTRY_PASS=…
+CODE_SERVER_PASSWORD=…
 
 # For Telegram alerts:
 TELEGRAM_BOT_TOKEN=…
@@ -80,7 +81,7 @@ AI_TRADING_PORT=5100
 GEMINI_API_KEY=
 ```
 
-### Step B — core stack (Portainer / Jellyfin / Vaultwarden)
+### Step B — core stack (Portainer / Jellyfin / Vaultwarden / code-server)
 
 ```bash
 chmod +x setup.sh scripts/*.sh update.sh
@@ -93,6 +94,7 @@ Then finish wizards:
 |-----|-----|
 | Portainer | `http://arnosatlas:9000` |
 | Vaultwarden | `http://arnosatlas:8080` → create account → set `VAULTWARDEN_SIGNUPS_ALLOWED=false` → `sudo ./update.sh vaultwarden` |
+| code-server | `http://arnosatlas:8443` → password from `CODE_SERVER_PASSWORD`; workspace `/projects` (= `/srv/nas/projects`) |
 | Jellyfin | `http://<lan-ip>:8096` |
 
 ### Step C — projects stack (RabbitMQ / Registry / Telegram)
@@ -191,10 +193,10 @@ Then run the update/deploy command you need below.
 
 ## 4) Update everything (day-to-day)
 
-### Core apps (Portainer, Jellyfin, Vaultwarden)
+### Core apps (Portainer, Jellyfin, Vaultwarden, code-server)
 
 ```bash
-sudo ./update.sh          # all three
+sudo ./update.sh          # all four
 sudo ./update.sh --prune  # also delete unused old images
 ```
 
@@ -224,6 +226,7 @@ This rewrites `compose/projects/.env` from `config.env`, pulls images it can, an
 sudo ./update.sh jellyfin
 sudo ./update.sh portainer
 sudo ./update.sh vaultwarden
+sudo ./update.sh code-server
 ```
 
 ### Projects — one service
@@ -250,7 +253,7 @@ sudo docker compose --env-file .env up -d registry
 
 | Changed | Apply with |
 |---------|------------|
-| Core ports / Tailscale / Vaultwarden signups / PUID | `sudo ./update.sh` or `sudo ./scripts/03-deploy-stack.sh` |
+| Core ports / Tailscale / Vaultwarden signups / code-server password / PUID | `sudo ./update.sh` or `sudo ./scripts/03-deploy-stack.sh` |
 | RabbitMQ / Registry / Telegram / AI Trading / HomeSecurity env | `sudo ./scripts/05-deploy-projects.sh` |
 | `TZ` (schedules) | projects deploy + recreate `ai-trading-ofelia` |
 
@@ -312,6 +315,7 @@ sudo docker compose --env-file .env up -d tellegram
 | Re-seed AI Trading folders/config | `sudo ./scripts/07-setup-ai-trading.sh` |
 | Overwrite AI Trading config from template | `sudo ./scripts/07-setup-ai-trading.sh --force` then `sudo nano …` |
 | Turn off Vaultwarden signups | Set `VAULTWARDEN_SIGNUPS_ALLOWED=false` in `config.env` → `sudo ./update.sh vaultwarden` |
+| Change code-server password | Set `CODE_SERVER_PASSWORD` in `config.env` → `sudo ./update.sh code-server` |
 | Free registry disk | `sudo ./scripts/06-registry-gc.sh --prune` |
 | Deploy shared logging (Loki/Grafana) | `sudo ./scripts/08-deploy-logging.sh` — see [LOGGING.md](LOGGING.md) |
 | Re-seed HomeSecurity folders/cameras.yaml | `sudo ./scripts/09-setup-homesecurity.sh` |
@@ -321,6 +325,7 @@ sudo docker compose --env-file .env up -d tellegram
 | Logs | `docker logs -f ai-trading` / `tellegram` / `homesecurity-api` / `homesecurity-pipeline` / `rabbitmq` |
 | Stop everything, keep data | `sudo ./scripts/uninstall-stack.sh` |
 | Start again after uninstall / reboot | `sudo ./start-all.sh` |
+| Projects down after a core-only update | `sudo ./scripts/05-deploy-projects.sh` (data under `/srv/nas/docker/…` is kept) |
 
 ---
 
@@ -330,6 +335,7 @@ sudo docker compose --env-file .env up -d tellegram
 |---------|-----|
 | Portainer | http://arnosatlas:9000 |
 | Vaultwarden | http://arnosatlas:8080 |
+| code-server (browser VS Code) | http://arnosatlas:8443 — workspace `/projects` |
 | RabbitMQ management | http://arnosatlas:15672 |
 | Registry | http://arnosatlas:5000 |
 | AI Trading | http://arnosatlas:5100 |

@@ -31,18 +31,26 @@ docker compose -f "${COMPOSE_FILE}" --env-file .env pull
 
 info "Starting stack (${COMPOSE_PROJECT_NAME})"
 info "Bind-mounted data under ${NAS_ROOT} is preserved (Portainer is not reset)"
-docker compose -f "${COMPOSE_FILE}" --env-file .env up -d --remove-orphans
+# Do not use --remove-orphans here: this project shares nothing with nas-projects,
+# but operators often have both stacks up and a mistaken orphan sweep is confusing.
+docker compose -f "${COMPOSE_FILE}" --env-file .env up -d
 
 info "Current containers"
 docker compose -f "${COMPOSE_FILE}" --env-file .env ps
 
 echo
 info "Core stack deployed (Tailscale-bound except Jellyfin):"
-echo "  Portainer:    http://${TAILSCALE_IP}:${PORTAINER_PORT}"
-echo "  Vaultwarden:  http://${TAILSCALE_IP}:${VAULTWARDEN_PORT}"
+echo "  Portainer:     http://${TAILSCALE_IP}:${PORTAINER_PORT}"
+echo "  Vaultwarden:   http://${TAILSCALE_IP}:${VAULTWARDEN_PORT}"
+echo "  code-server:   http://${TAILSCALE_IP}:${CODE_SERVER_PORT}  (workspace: ${NAS_ROOT}/projects → /projects)"
 echo "  Jellyfin (LAN): http://<lan-ip>:${JELLYFIN_PORT}"
 echo
 info "Day-to-day image updates: sudo ./update.sh  (does not re-run Docker install)"
+info "Projects stack is separate — if RabbitMQ/AI Trading/HomeSecurity are down: sudo ./scripts/05-deploy-projects.sh"
+warn_if_projects_stack_down
 if [[ "${VAULTWARDEN_SIGNUPS_ALLOWED}" == "true" ]]; then
   warn "Vaultwarden signups are ENABLED. Create your account, then set VAULTWARDEN_SIGNUPS_ALLOWED=false in config.env and re-run deploy or update."
+fi
+if [[ "${CODE_SERVER_PASSWORD}" == "changeme" ]]; then
+  warn "code-server password is still 'changeme'. Set CODE_SERVER_PASSWORD in config.env and re-run deploy or update."
 fi
