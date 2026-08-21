@@ -26,7 +26,7 @@ if ! docker_ready; then
   die "Docker is not ready. Run scripts/01-install-docker.sh first, then retry: sudo ./start-all.sh"
 fi
 
-info "Bringing up core stack (Portainer, Jellyfin, Vaultwarden)"
+info "Bringing up core stack (Portainer, Jellyfin, Vaultwarden, code-server)"
 "${SCRIPT_DIR}/03-deploy-stack.sh"
 
 info "Bringing up projects stack (RabbitMQ, Registry, Tellegram, AI Trading, HomeSecurity)"

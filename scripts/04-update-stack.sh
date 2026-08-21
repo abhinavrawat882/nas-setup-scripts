@@ -32,8 +32,9 @@ for arg in "$@"; do
       cat <<'EOF'
 Update NAS stack containers (images only). App data under NAS_ROOT is kept.
 
-  sudo ./scripts/04-update-stack.sh              Update Portainer, Jellyfin, Vaultwarden
+  sudo ./scripts/04-update-stack.sh              Update Portainer, Jellyfin, Vaultwarden, code-server
   sudo ./scripts/04-update-stack.sh jellyfin     Update only Jellyfin
+  sudo ./scripts/04-update-stack.sh code-server  Update only code-server
   sudo ./scripts/04-update-stack.sh --prune      Update all, then remove unused images
 EOF
       exit 0
@@ -66,9 +67,9 @@ if [[ ${#SERVICES[@]} -eq 0 ]]; then
 else
   for svc in "${SERVICES[@]}"; do
     case "${svc}" in
-      portainer|jellyfin|vaultwarden) ;;
+      portainer|jellyfin|vaultwarden|code-server) ;;
       *)
-        die "Unknown service '${svc}'. Use: portainer, jellyfin, or vaultwarden"
+        die "Unknown service '${svc}'. Use: portainer, jellyfin, vaultwarden, or code-server"
         ;;
     esac
   done

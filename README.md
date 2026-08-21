@@ -6,6 +6,7 @@ Idempotent scripts to put Docker on **OpenMediaVault**, then deploy:
 |-----|------------|--------|
 | **Portainer** | Manage Docker from phone/browser | Tailscale `http://<TAILSCALE_IP>:9000` |
 | **Vaultwarden** | Self-hosted Bitwarden-compatible password manager | Tailscale `http://<TAILSCALE_IP>:8080` |
+| **code-server** | Browser VS Code | Tailscale `http://<TAILSCALE_IP>:8443` |
 | **Jellyfin** | Media server | LAN `http://<lan-ip>:8096` (discovery on LAN) |
 | **RabbitMQ** | Message broker (projects stack) | Tailscale AMQP / management UI |
 | **Registry** | Private Docker registry (projects stack) | Tailscale `http://<TAILSCALE_IP>:5000` |
@@ -63,16 +64,17 @@ sudo ./scripts/05-deploy-projects.sh
 
 Full recipes (first-time vs update-all vs one service): **[docs/HOWTO_USE_SCRIPTS.md](docs/HOWTO_USE_SCRIPTS.md)**.
 
-Pull newer images and recreate containers. **Portainer login, Jellyfin config/libraries, and Vaultwarden vault stay on disk** under `NAS_ROOT` — only the container image/layers are refreshed.
+Pull newer images and recreate containers. **Portainer login, Jellyfin config/libraries, Vaultwarden vault, and code-server settings** stay on disk under `NAS_ROOT` — only the container image/layers are refreshed.
 
 ```bash
-# Update all (Portainer + Jellyfin + Vaultwarden)
+# Update all (Portainer + Jellyfin + Vaultwarden + code-server)
 sudo ./update.sh
 
 # Update one app
 sudo ./update.sh jellyfin
 sudo ./update.sh portainer
 sudo ./update.sh vaultwarden
+sudo ./update.sh code-server
 
 # Optional: also delete unused old images afterward
 sudo ./update.sh --prune
@@ -88,9 +90,10 @@ After changing `config.env` (ports, signup flag, paths, Tailscale IP), either `s
 | `PUID` / `PGID` | File ownership inside containers (OMV: often your uid + group `users` = `100`) |
 | `TZ` | Timezone |
 | `MEDIA_PATH` | Optional override; default `${NAS_ROOT}/media` |
-| `TAILSCALE_IP` | NAS Tailscale IP (default `100.92.27.123`); Portainer/Vaultwarden/RabbitMQ/Registry bind here |
-| `PORTAINER_PORT` / `JELLYFIN_PORT` / `VAULTWARDEN_PORT` | Host ports |
+| `TAILSCALE_IP` | NAS Tailscale IP (default `100.92.27.123`); Portainer/Vaultwarden/code-server/RabbitMQ/Registry bind here |
+| `PORTAINER_PORT` / `JELLYFIN_PORT` / `VAULTWARDEN_PORT` / `CODE_SERVER_PORT` | Host ports |
 | `VAULTWARDEN_SIGNUPS_ALLOWED` | `true` until you create an account, then `false` |
+| `CODE_SERVER_PASSWORD` | Login password for browser VS Code (change from `changeme`) |
 | `RABBITMQ_USER` / `RABBITMQ_PASS` | Broker credentials (change from `changeme`) |
 | `REGISTRY_USER` / `REGISTRY_PASS` | Registry basic auth (change from `changeme`) |
 | `REGISTRY_KEEP_TAGS` | Tags to keep per repo when running GC with `--prune` (default `5`) |
@@ -118,6 +121,7 @@ After changing `config.env` (ports, signup flag, paths, Tailscale IP), either `s
    - Music → `/data/music`  
    Put files in `movies/`, `tv/`, `music/` under your media path on the NAS.
 3. **Vaultwarden** — over Tailscale, open `http://<TAILSCALE_IP>:8080`, create your account. Then set `VAULTWARDEN_SIGNUPS_ALLOWED=false` and re-run deploy or `update.sh`. Point the Bitwarden app at `http://<TAILSCALE_IP>:8080`.
+4. **code-server** — over Tailscale, open `http://<TAILSCALE_IP>:8443`, sign in with `CODE_SERVER_PASSWORD`. The default workspace is `/projects` (host path `${NAS_ROOT}/projects`). Change the password from `changeme` in `config.env` before first use, then redeploy or `sudo ./update.sh code-server`.
 
 ## Projects stack (RabbitMQ + Registry + TellegramService + AI Trading + HomeSecurity)
 
@@ -292,6 +296,7 @@ $NAS_ROOT/
     portainer/
     jellyfin/config/
     vaultwarden/
+    code-server/           # IDE settings / extensions
     rabbitmq/
     registry/
     registry-auth/
@@ -306,6 +311,7 @@ $NAS_ROOT/
     loki/
     grafana/
     alloy/
+  projects/                # code-server workspace (→ /projects in the IDE)
   media/{movies,tv,music}/
 ```
 
