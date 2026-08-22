@@ -27,7 +27,7 @@ Data under `/srv/nas/docker/…` and `/srv/nas/media/…` is **bind-mounted**. U
 | `./start-all.sh` | **After a reboot** (or uninstall) — bring core + projects + logging back up |
 | `scripts/01-install-docker.sh` | Docker missing / broken (rarely alone) |
 | `scripts/02-prepare-dirs.sh` | Re-create folder layout under `NAS_ROOT` |
-| `scripts/03-deploy-stack.sh` | Apply `config.env` + (re)start **core**: Portainer, Jellyfin, Vaultwarden |
+| `scripts/03-deploy-stack.sh` | Apply `config.env` + (re)start **core only**: Portainer, Jellyfin, Vaultwarden (does **not** stop projects/logging) |
 | `./update.sh` [name] | Day-to-day **core** image updates (`jellyfin`, `portainer`, `vaultwarden`) |
 | `scripts/05-deploy-projects.sh` | (Re)start **projects**: RabbitMQ, Registry, Tellegram, AI Trading, HomeSecurity |
 | `scripts/07-setup-ai-trading.sh` | First-time AI Trading dirs + seed config (+ optional `--deploy`) |
@@ -250,7 +250,7 @@ sudo docker compose --env-file .env up -d registry
 
 | Changed | Apply with |
 |---------|------------|
-| Core ports / Tailscale / Vaultwarden signups / PUID | `sudo ./update.sh` or `sudo ./scripts/03-deploy-stack.sh` |
+| Core ports / Tailscale / Vaultwarden signups / PUID / `MEDIA_PATH` | `sudo ./update.sh` or `sudo ./scripts/03-deploy-stack.sh` (core only; projects stay up) |
 | RabbitMQ / Registry / Telegram / AI Trading / HomeSecurity env | `sudo ./scripts/05-deploy-projects.sh` |
 | `TZ` (schedules) | projects deploy + recreate `ai-trading-ofelia` |
 
