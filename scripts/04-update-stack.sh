@@ -58,26 +58,27 @@ if docker ps -a --format '{{.Names}}' | grep -qx 'plex'; then
   docker rm -f plex >/dev/null
 fi
 
-info "Updating images (data under ${NAS_ROOT} is NOT deleted)"
+# Never use --remove-orphans here — it can stop projects/logging containers that
+# share (or previously shared) this Compose project name.
+info "Updating core images (data under ${NAS_ROOT} is NOT deleted; other stacks left alone)"
 if [[ ${#SERVICES[@]} -eq 0 ]]; then
-  docker compose -f "${COMPOSE_FILE}" --env-file .env pull
-  info "Recreating containers with new images"
-  docker compose -f "${COMPOSE_FILE}" --env-file .env up -d --remove-orphans
-else
-  for svc in "${SERVICES[@]}"; do
-    case "${svc}" in
-      portainer|jellyfin|vaultwarden) ;;
-      *)
-        die "Unknown service '${svc}'. Use: portainer, jellyfin, or vaultwarden"
-        ;;
-    esac
-  done
-  docker compose -f "${COMPOSE_FILE}" --env-file .env pull "${SERVICES[@]}"
-  info "Recreating: ${SERVICES[*]}"
-  docker compose -f "${COMPOSE_FILE}" --env-file .env up -d --no-deps --remove-orphans "${SERVICES[@]}"
+  SERVICES=(portainer jellyfin vaultwarden)
 fi
 
-info "Current containers"
+for svc in "${SERVICES[@]}"; do
+  case "${svc}" in
+    portainer|jellyfin|vaultwarden) ;;
+    *)
+      die "Unknown service '${svc}'. Use: portainer, jellyfin, or vaultwarden"
+      ;;
+  esac
+done
+
+docker compose -f "${COMPOSE_FILE}" --env-file .env pull "${SERVICES[@]}"
+info "Recreating: ${SERVICES[*]}"
+docker compose -f "${COMPOSE_FILE}" --env-file .env up -d --no-deps "${SERVICES[@]}"
+
+info "Core containers"
 docker compose -f "${COMPOSE_FILE}" --env-file .env ps
 
 if [[ "${PRUNE}" == "true" ]]; then
@@ -90,3 +91,5 @@ info "Update finished. Portainer / Jellyfin / Vaultwarden settings and data were
 echo "  Portainer:      http://${TAILSCALE_IP}:${PORTAINER_PORT}"
 echo "  Vaultwarden:    http://${TAILSCALE_IP}:${VAULTWARDEN_PORT}"
 echo "  Jellyfin (LAN): http://<lan-ip>:${JELLYFIN_PORT}"
+echo
+info "Projects / logging were not touched (use 05-deploy-projects.sh / 08-deploy-logging.sh / start-all.sh)."

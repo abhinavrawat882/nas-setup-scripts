@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Generate compose/.env and bring the NAS core stack up.
+# Generate compose/.env and bring the NAS *core* stack up (Portainer, Jellyfin,
+# Vaultwarden only). Does not stop or recreate projects/logging containers.
 # Idempotent: re-run to apply config changes / pull updates.
 set -euo pipefail
 
@@ -26,14 +27,20 @@ if docker ps -a --format '{{.Names}}' | grep -qx 'plex'; then
   docker rm -f plex >/dev/null
 fi
 
-info "Pulling images"
-docker compose -f "${COMPOSE_FILE}" --env-file .env pull
+CORE_SERVICES=(portainer jellyfin vaultwarden)
 
-info "Starting stack (${COMPOSE_PROJECT_NAME})"
-info "Bind-mounted data under ${NAS_ROOT} is preserved (Portainer is not reset)"
-docker compose -f "${COMPOSE_FILE}" --env-file .env up -d --remove-orphans
+info "Pulling core images"
+docker compose -f "${COMPOSE_FILE}" --env-file .env pull "${CORE_SERVICES[@]}"
 
-info "Current containers"
+# Only start the three core services. Do NOT pass --remove-orphans: that flag
+# removes any container labeled with this Compose project that is not in
+# docker-compose.yml. If projects/logging were ever started under the same
+# project name (or left as orphans), --remove-orphans would stop them.
+info "Starting core stack only (${COMPOSE_PROJECT_NAME}: ${CORE_SERVICES[*]})"
+info "Bind-mounted data under ${NAS_ROOT} is preserved; projects/logging stacks are left running"
+docker compose -f "${COMPOSE_FILE}" --env-file .env up -d --no-deps "${CORE_SERVICES[@]}"
+
+info "Core containers"
 docker compose -f "${COMPOSE_FILE}" --env-file .env ps
 
 echo
@@ -41,6 +48,11 @@ info "Core stack deployed (Tailscale-bound except Jellyfin):"
 echo "  Portainer:    http://${TAILSCALE_IP}:${PORTAINER_PORT}"
 echo "  Vaultwarden:  http://${TAILSCALE_IP}:${VAULTWARDEN_PORT}"
 echo "  Jellyfin (LAN): http://<lan-ip>:${JELLYFIN_PORT}"
+echo
+info "Projects / logging were not touched. Bring them up with:"
+echo "  sudo ./scripts/05-deploy-projects.sh"
+echo "  sudo ./scripts/08-deploy-logging.sh"
+echo "  # or everything: sudo ./start-all.sh"
 echo
 info "Day-to-day image updates: sudo ./update.sh  (does not re-run Docker install)"
 if [[ "${VAULTWARDEN_SIGNUPS_ALLOWED}" == "true" ]]; then
